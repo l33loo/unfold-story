@@ -4,8 +4,8 @@
         <meta charset="utf-9">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>Unfold Stories</title>
-        <link rel="stylesheet" href="./styles.css"/>
-        <script type="text/javascript" src="./scripts.js" defer></script>
+        <link rel="stylesheet" href="public/game/styles.css"/>
+        <script type="text/javascript" src="public/game/scripts.js" defer></script>
     </head>
     <body>
         <noscript>
@@ -13,8 +13,8 @@
         </noscript>
         <h1>Unfold Stories</h1>
         <p id="root">{instructions...}</p>
-        <form>
-            <input type="text" placeholder="Your name" />
+        <form id="join">
+            <input name="name" id="name" type="text" placeholder="Your name" />
             <input type="submit" value="Join" />
         </form>
         <div>

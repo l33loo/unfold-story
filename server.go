@@ -10,6 +10,7 @@ import (
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-type", "text/html")
 		f, err := os.Open("./public/index.html")
 		if err != nil {
 			fmt.Println(err.Error())
@@ -18,13 +19,48 @@ func main() {
 		io.Copy(w, f)
 	})
 
-	http.HandleFunc("/new", func(w http.ResponseWriter, r *http.Request) {
-		// uuid, _ := exec.Command("uuidgen").Output()
-		// redirectURL := fmt.Sprintf("%s/game/%s", r.URL.Host, uuid)
-		// http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+	http.HandleFunc("/public/styles.css", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-type", "text/css")
+		f, err := os.Open("./public/styles.css")
 
-		redirectURL := fmt.Sprintf("%s/game", r.URL.Host)
-		http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		io.Copy(w, f)
+	})
+
+	http.HandleFunc("/public/scripts.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-type", "text/javascript")
+		f, err := os.Open("./public/scripts.js")
+
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		io.Copy(w, f)
+	})
+
+	http.HandleFunc("/public/game/styles.css", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-type", "text/css")
+		f, err := os.Open("./public/game/styles.css")
+
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		io.Copy(w, f)
+	})
+
+	http.HandleFunc("/public/game/scripts.js", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Content-type", "text/javascript")
+		f, err := os.Open("./public/game/scripts.js")
+
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+
+		io.Copy(w, f)
 	})
 
 	http.HandleFunc("/game", func(w http.ResponseWriter, r *http.Request) {
@@ -34,6 +70,14 @@ func main() {
 		}
 
 		io.Copy(w, f)
+	})
+
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(101)
+		w.Header().Add("Upgrade", "websocket")
+		w.Header().Add("Connection", "Upgrade")
+		w.Header().Add("Sec-WebSocket-Accept", "world")
+		w.Header().Add("Sec-WebSocket-Protocol", "chat")
 	})
 
 	err := http.ListenAndServe(":8080", nil)
