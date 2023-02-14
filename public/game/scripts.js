@@ -2,6 +2,10 @@ document.addEventListener("DOMContentLoaded", () => {
     fetch("/ws", {
         method: "GET",
         headers: {
+            // As per RFC6455:
+            // The client includes the hostname in the |Host| header field of its
+            // handshake as per [RFC2616], so that both the client and the server
+            // can verify that they agree on which host is in use.
             "Host": "localhost",
             "Upgrade": "websocket",
             "Connection": "Upgrade",

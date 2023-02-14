@@ -77,6 +77,17 @@ func main() {
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		// As per RFC6455:
+		// The client includes the hostname in the |Host| header field of its
+		// handshake as per [RFC2616], so that both the client and the server
+		// can verify that they agree on which host is in use.
+		host := r.Header.Get("Host")
+		if host != "localhost" {
+			w.WriteHeader(403)
+			fmt.Printf("forbidden host: %s\n", host)
+			return
+		}
+
+		// As per RFC6455:
 		// For this header field [Sec-WebSocket-Key], the server has to take the value (as present
 		// in the header field, e.g., the base64-encoded [RFC4648] version minus
 		// any leading and trailing whitespace) and concatenate this with the
