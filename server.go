@@ -1,11 +1,14 @@
 package main
 
 import (
+	"crypto/sha1"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func main() {
@@ -73,10 +76,27 @@ func main() {
 	})
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		// As per RFC6455:
+		// For this header field [Sec-WebSocket-Key], the server has to take the value (as present
+		// in the header field, e.g., the base64-encoded [RFC4648] version minus
+		// any leading and trailing whitespace) and concatenate this with the
+		// Globally Unique Identifier (GUID, [RFC4122]) "258EAFA5-E914-47DA-
+		// 95CA-C5AB0DC85B11" in string form, which is unlikely to be used by
+		// network endpoints that do not understand the WebSocket Protocol.  A
+		// SHA-1 hash (160 bits) [FIPS.180-3], base64-encoded (see Section 4 of
+		// [RFC4648]), of this concatenation is then returned in the server's
+		// handshake.
+		wsKey := r.Header.Get("Sec-WebSocket-Key")
+		wsKeyConcat := strings.TrimSpace(wsKey) + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+		wsBytes := []byte(wsKeyConcat)
+		hasher := sha1.New()
+		hasher.Write(wsBytes)
+		sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+
 		w.WriteHeader(101)
 		w.Header().Add("Upgrade", "websocket")
 		w.Header().Add("Connection", "Upgrade")
-		w.Header().Add("Sec-WebSocket-Accept", "world")
+		w.Header().Add("Sec-WebSocket-Accept", sha)
 		w.Header().Add("Sec-WebSocket-Protocol", "chat")
 	})
 
