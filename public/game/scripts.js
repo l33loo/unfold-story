@@ -6,7 +6,7 @@ document.addEventListener("DOMContentLoaded", () => {
             // The client includes the hostname in the |Host| header field of its
             // handshake as per [RFC2616], so that both the client and the server
             // can verify that they agree on which host is in use.
-            "Host": "localhost",
+            "Host": "localhost:8080",
             "Upgrade": "websocket",
             "Connection": "Upgrade",
             "Sec-WebSocket-Key": "hello",

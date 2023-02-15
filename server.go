@@ -80,8 +80,9 @@ func main() {
 		// The client includes the hostname in the |Host| header field of its
 		// handshake as per [RFC2616], so that both the client and the server
 		// can verify that they agree on which host is in use.
-		host := r.Header.Get("Host")
-		if host != "localhost" {
+		host := r.Host
+		fmt.Printf("host: %s\n", host)
+		if host != "localhost:8080" {
 			w.WriteHeader(403)
 			fmt.Printf("forbidden host: %s\n", host)
 			return
@@ -103,6 +104,7 @@ func main() {
 		hasher := sha1.New()
 		hasher.Write(wsBytes)
 		sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+		fmt.Printf("SHA <3: %s\n", sha)
 
 		w.WriteHeader(101)
 		w.Header().Add("Upgrade", "websocket")
