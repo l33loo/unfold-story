@@ -87,6 +87,12 @@ func main() {
 			return
 		}
 
+		if !r.ProtoAtLeast(1, 1) {
+			w.WriteHeader(403)
+			fmt.Printf("forbidden HTTP protocol version %s\n, must be 1.1 or higher", r.Proto)
+			return
+		}
+
 		// As per RFC6455:
 		// The client includes the hostname in the |Host| header field of its
 		// handshake as per [RFC2616], so that both the client and the server
