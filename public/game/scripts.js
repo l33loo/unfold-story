@@ -58,6 +58,16 @@ document.addEventListener("DOMContentLoaded", () => {
         if (secWebSocketAccept !== "Kfh9QIsMVZcl6xEPYxPHzW8SZ8w="){
             throw new Error(`invalid Sec-WebSocket-Accept header ${secWebSocketAccept}`)
         }
+
+        // If the response includes a |Sec-WebSocket-Protocol| header field
+        // and this header field indicates the use of a subprotocol that was
+        // not present in the client's handshake (the server has indicated a
+        // subprotocol not requested by the client), the client MUST _Fail
+        // the WebSocket Connection_.
+        const secWebSocketProtocol = headers.get("Sec-WebSocket-Protocol")
+        if (secWebSocketProtocol !== null && secWebSocketProtocol !== "chat" && secWebSocketProtocol !== "superchat") {
+            throw new Error(`invalid Sec-WebSocket-Protocol ${secWebSocketProtocol}: must be 'chat' or 'supercaht'`)
+        }
         
     const playerName = localStorage.getItem("name")
     if (playerName !== null && playerName.length > 0) {
