@@ -106,11 +106,11 @@ func main() {
 		sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 		fmt.Printf("SHA <3: %s\n", sha)
 
-		w.WriteHeader(101)
 		w.Header().Add("Upgrade", "websocket")
 		w.Header().Add("Connection", "Upgrade")
 		w.Header().Add("Sec-WebSocket-Accept", sha)
 		w.Header().Add("Sec-WebSocket-Protocol", "chat")
+		w.WriteHeader(101)
 	})
 
 	err := http.ListenAndServe(":8080", nil)
