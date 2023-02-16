@@ -46,6 +46,18 @@ document.addEventListener("DOMContentLoaded", () => {
         if (connection !== "Upgrade") {
             throw new Error(`error with Connection header: value ${connection} instead of "Upgrade`)
         }
+
+        // If the response lacks a |Sec-WebSocket-Accept| header field or
+        // the |Sec-WebSocket-Accept| contains a value other than the
+        // base64-encoded SHA-1 of the concatenation of the |Sec-WebSocket-
+        // Key| (as a string, not base64-decoded) with the string "258EAFA5-
+        // E914-47DA-95CA-C5AB0DC85B11" but ignoring any leading and
+        // trailing whitespace, the client MUST _Fail the WebSocket
+        // Connection_.
+        const secWebSocketAccept = headers.get("Sec-WebSocket-Accept")
+        if (secWebSocketAccept !== "Kfh9QIsMVZcl6xEPYxPHzW8SZ8w="){
+            throw new Error(`invalid Sec-WebSocket-Accept header ${secWebSocketAccept}`)
+        }
         
     const playerName = localStorage.getItem("name")
     if (playerName !== null && playerName.length > 0) {
