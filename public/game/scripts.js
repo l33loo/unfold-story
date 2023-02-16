@@ -25,9 +25,19 @@ document.addEventListener("DOMContentLoaded", () => {
         if (status !== 101) {
             throw new Error(`wrong HTTP status: ${status} instead of 101`)
         }
-        console.log("fetch then <3")
 
-        console.log("window load <3")
+        // If the response lacks an |Upgrade| header field or the |Upgrade|
+        // header field contains a value that is not an ASCII case-
+        // insensitive match for the value "websocket", the client MUST
+        // _Fail the WebSocket Connection_.
+        const headers = resp.headers
+        console.log("headers <3")
+        console.dir(headers)
+        const upgrade = headers.get("Upgrade")
+        if (upgrade !== "websocket") {
+            throw new Error(`error with Upgrade header: value ${upgrade} instead of 'websocket'`)
+        }
+        
     const playerName = localStorage.getItem("name")
     if (playerName !== null && playerName.length > 0) {
         const nameInput = document.getElementById("name")
@@ -42,7 +52,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const join = document.getElementById("join")
     join.addEventListener("submit", joinEventHandler)
-    }).catch(() => {
+    }).catch((err) => {
         // handle error
+        console.log(err.message)
     })
 })
