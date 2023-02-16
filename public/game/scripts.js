@@ -14,7 +14,17 @@ document.addEventListener("DOMContentLoaded", () => {
             "Sec-WebSocket-Protocol": "chat, superchat",
             "Sec-WebSocket-Version": "13"
         }
-    }).then(() => {
+    }).then((resp) => {
+        // If the status code received from the server is not 101, the
+        // client handles the response per HTTP [RFC2616] procedures.  In
+        // particular, the client might perform authentication if it
+        // receives a 401 status code; the server might redirect the client
+        // using a 3xx status code (but clients are not required to follow
+        // them), etc.  Otherwise, proceed as follows.
+        const status = resp.status
+        if (status !== 101) {
+            throw new Error(`wrong HTTP status: ${status} instead of 101`)
+        }
         console.log("fetch then <3")
 
         console.log("window load <3")
@@ -32,5 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const join = document.getElementById("join")
     join.addEventListener("submit", joinEventHandler)
+    }).catch(() => {
+        // handle error
     })
 })
