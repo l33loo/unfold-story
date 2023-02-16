@@ -37,6 +37,15 @@ document.addEventListener("DOMContentLoaded", () => {
         if (upgrade !== "websocket") {
             throw new Error(`error with Upgrade header: value ${upgrade} instead of 'websocket'`)
         }
+
+        // If the response lacks a |Connection| header field or the
+        // |Connection| header field doesn't contain a token that is an
+        // ASCII case-insensitive match for the value "Upgrade", the client
+        // MUST _Fail the WebSocket Connection_.
+        const connection = headers.get("Connection")
+        if (connection !== "Upgrade") {
+            throw new Error(`error with Connection header: value ${connection} instead of "Upgrade`)
+        }
         
     const playerName = localStorage.getItem("name")
     if (playerName !== null && playerName.length > 0) {
