@@ -12,7 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
             "Sec-WebSocket-Key": "hello",
             "Origin": "localhost",
             "Sec-WebSocket-Protocol": "chat, superchat",
-            "Sec-WebSocket-Version0": "13"
+            "Sec-WebSocket-Version": "13"
         }
     }).then(() => {
         console.log("fetch then <3")
