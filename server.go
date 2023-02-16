@@ -76,6 +76,17 @@ func main() {
 	})
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		// An HTTP/1.1 or higher GET request, including a "Request-URI"
+		// [RFC2616] that should be interpreted as a /resource name/
+		// defined in Section 3 (or an absolute HTTP/HTTPS URI containing
+		// the /resource name/).
+		method := r.Method
+		if method != "GET" {
+			w.WriteHeader(403)
+			fmt.Printf("forbidden method %s\n, must be 'GET'", method)
+			return
+		}
+
 		// As per RFC6455:
 		// The client includes the hostname in the |Host| header field of its
 		// handshake as per [RFC2616], so that both the client and the server
