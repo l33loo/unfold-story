@@ -105,6 +105,21 @@ func main() {
 			return
 		}
 
+		// An |Upgrade| header field containing the value "websocket",
+		// treated as an ASCII case-insensitive value.
+		fmt.Println("HEADERS <3:")
+		for name, values := range r.Header {
+			for _, value := range values {
+				fmt.Println(name, value)
+			}
+		}
+		upgrade := r.Header.Get("Upgrade")
+		if upgrade != "websocket" {
+			w.WriteHeader(400)
+			fmt.Printf("invalid Upgrade header %s, must be 'websocket'", upgrade)
+			return
+		}
+
 		// As per RFC6455:
 		// For this header field [Sec-WebSocket-Key], the server has to take the value (as present
 		// in the header field, e.g., the base64-encoded [RFC4648] version minus
