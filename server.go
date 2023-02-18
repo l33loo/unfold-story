@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bufio"
 	"crypto/sha1"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -128,39 +131,92 @@ func main() {
 		// nonce consisting of a randomly selected 16-byte value that has
 		// been base64-encoded (see Section 4 of [RFC4648]).  The nonce
 		// MUST be selected randomly for each connection.
-		wsKeyBytes := []byte(wsKey)
+		wsKeyBytes, err := base64.StdEncoding.DecodeString(wsKey)
+		if err != nil {
+			http.Error(w, "error decoding Sec-WebSocket-Key header", http.StatusInternalServerError)
+			return
+		}
 		if len(wsKeyBytes) != 16 {
 			http.Error(w, "invalid Sec-WebSocket-Key header, must be 16-bytes long", http.StatusBadRequest)
-			fmt.Println("invalid Sec-WebSocket-Key header, must be 16-bytes long")
+			fmt.Printf("invalid Sec-WebSocket-Key header length of %d, must be 16-bytes long", len(wsKeyBytes))
 			return
 		}
 
-		// As per RFC6455:
-		// For this header field [Sec-WebSocket-Key], the server has to take the value (as present
-		// in the header field, e.g., the base64-encoded [RFC4648] version minus
-		// any leading and trailing whitespace) and concatenate this with the
-		// Globally Unique Identifier (GUID, [RFC4122]) "258EAFA5-E914-47DA-
-		// 95CA-C5AB0DC85B11" in string form, which is unlikely to be used by
-		// network endpoints that do not understand the WebSocket Protocol.  A
-		// SHA-1 hash (160 bits) [FIPS.180-3], base64-encoded (see Section 4 of
-		// [RFC4648]), of this concatenation is then returned in the server's
-		// handshake.
-		wsKeyConcat := strings.TrimSpace(wsKey) + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
-		wsBytes := []byte(wsKeyConcat)
-		hasher := sha1.New()
-		hasher.Write(wsBytes)
-		sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
-		fmt.Printf("SHA <3: %s\n", sha)
-
-		w.Header().Add("Upgrade", "websocket")
-		w.Header().Add("Connection", "Upgrade")
-		w.Header().Add("Sec-WebSocket-Accept", sha)
-		w.Header().Add("Sec-WebSocket-Protocol", "chat")
-		w.WriteHeader(101)
+		err = WsHandler(w, r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	})
 
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func WsHandler(w http.ResponseWriter, req *http.Request) error {
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		return errors.New("webserver doesn't support http hijacking")
+	}
+	conn, bufwr, err := hj.Hijack()
+	if err != nil {
+		return err
+	}
+
+	ws := &Ws{conn, bufwr, req}
+	defer ws.conn.Close()
+
+	err = ws.Handshake()
+	if err != nil {
+		fmt.Printf("unsuccessful ws handshake: %s", err.Error())
+		return err
+	}
+
+	return nil
+}
+
+func (ws *Ws) Handshake() error {
+	// As per RFC6455:
+	// For this header field [Sec-WebSocket-Key], the server has to take the value (as present
+	// in the header field, e.g., the base64-encoded [RFC4648] version minus
+	// any leading and trailing whitespace) and concatenate this with the
+	// Globally Unique Identifier (GUID, [RFC4122]) "258EAFA5-E914-47DA-
+	// 95CA-C5AB0DC85B11" in string form, which is unlikely to be used by
+	// network endpoints that do not understand the WebSocket Protocol.  A
+	// SHA-1 hash (160 bits) [FIPS.180-3], base64-encoded (see Section 4 of
+	// [RFC4648]), of this concatenation is then returned in the server's
+	// handshake.
+	wsKeyConcat := strings.TrimSpace(ws.request.Header.Get("Sec-WebSocket-Key")) + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+	wsBytes := []byte(wsKeyConcat)
+	hasher := sha1.New()
+	hasher.Write(wsBytes)
+	sha := base64.StdEncoding.EncodeToString(hasher.Sum(nil))
+	fmt.Printf("SHA <3: %s\n", sha)
+
+	lines := []string{
+		fmt.Sprintf("HTTP/%d.%d 101 Switching Protocols", ws.request.ProtoMajor, ws.request.ProtoMinor),
+		"Upgrade: websocket",
+		"Connection: Upgrade",
+		fmt.Sprintf("Sec-WebSocket-Accept: %s", sha),
+		"Sec-WebSocket-Protocol: chat",
+		"\n\r",
+	}
+
+	return ws.write([]byte(strings.Join(lines, "\n\r")))
+}
+
+func (ws *Ws) write(data []byte) error {
+	_, err := ws.bufrw.Write(data)
+	if err != nil {
+		return err
+	}
+	return ws.bufrw.Flush()
+}
+
+type Ws struct {
+	conn    net.Conn
+	bufrw   *bufio.ReadWriter
+	request *http.Request
 }
