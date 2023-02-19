@@ -14,6 +14,8 @@ import (
 	"strings"
 )
 
+var testConn net.Conn
+
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-type", "text/html")
@@ -159,8 +161,12 @@ func WsHandler(w http.ResponseWriter, req *http.Request) error {
 		return err
 	}
 
+	log.Println("HERE! <3")
+
+	testConn = conn
+
 	ws := &Ws{conn, bufwr, req}
-	defer ws.conn.Close()
+	// defer ws.conn.Close()
 
 	err = ws.Handshake()
 	if err != nil {
