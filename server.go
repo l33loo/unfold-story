@@ -139,6 +139,7 @@ func main() {
 		}
 
 		err = WsHandler(w, r)
+		// TODO: Change error handling because may no longer use HTTP
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -152,32 +153,15 @@ func main() {
 }
 
 func WsHandler(w http.ResponseWriter, req *http.Request) error {
-	hj, ok := w.(http.Hijacker)
-	if !ok {
-		return errors.New("webserver doesn't support http hijacking")
-	}
-	conn, bufwr, err := hj.Hijack()
+	_, err := handshake(w, req)
 	if err != nil {
-		return err
-	}
-
-	log.Println("HERE! <3")
-
-	testConn = conn
-
-	ws := &Ws{conn, bufwr, req}
-	// defer ws.conn.Close()
-
-	err = ws.Handshake()
-	if err != nil {
-		fmt.Printf("unsuccessful ws handshake: %s", err.Error())
 		return err
 	}
 
 	return nil
 }
 
-func (ws *Ws) Handshake() error {
+func handshake(w http.ResponseWriter, r *http.Request) (*Ws, error) {
 	// As per RFC6455:
 	// For this header field [Sec-WebSocket-Key], the server has to take the value (as present
 	// in the header field, e.g., the base64-encoded [RFC4648] version minus
@@ -188,23 +172,34 @@ func (ws *Ws) Handshake() error {
 	// SHA-1 hash (160 bits) [FIPS.180-3], base64-encoded (see Section 4 of
 	// [RFC4648]), of this concatenation is then returned in the server's
 	// handshake.
-	wsKeyConcat := strings.TrimSpace(ws.request.Header.Get("Sec-WebSocket-Key")) + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
+	wsKeyConcat := strings.TrimSpace(r.Header.Get("Sec-WebSocket-Key")) + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 	wsBytes := []byte(wsKeyConcat)
 	hasher := sha1.New()
 	hasher.Write(wsBytes)
 	sha := base64.StdEncoding.EncodeToString(hasher.Sum(nil))
-	fmt.Printf("SHA <3: %s\n", sha)
 
-	lines := []string{
-		fmt.Sprintf("HTTP/%d.%d 101 Switching Protocols", ws.request.ProtoMajor, ws.request.ProtoMinor),
-		"Upgrade: websocket",
-		"Connection: Upgrade",
-		fmt.Sprintf("Sec-WebSocket-Accept: %s", sha),
-		"Sec-WebSocket-Protocol: chat",
-		"\n\r",
+	w.Header().Add("Upgrade", "websocket")
+	w.Header().Add("Connection", "Upgrade")
+	w.Header().Add("Sec-WebSocket-Accept", sha)
+	w.Header().Add("Sec-WebSocket-Protocol", "chat")
+	w.WriteHeader(101)
+
+	hj, ok := w.(http.Hijacker)
+	if !ok {
+		return nil, errors.New("webserver doesn't support http hijacking")
+	}
+	conn, bufwr, err := hj.Hijack()
+	if err != nil {
+		return nil, err
 	}
 
-	return ws.write([]byte(strings.Join(lines, "\r\n")))
+	log.Println("HERE! <3")
+
+	ws := &Ws{conn, bufwr, r}
+	testConn = ws.conn
+	// defer ws.conn.Close()
+
+	return ws, nil
 }
 
 func (ws *Ws) write(data []byte) error {
