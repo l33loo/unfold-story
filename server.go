@@ -110,12 +110,6 @@ func main() {
 
 		// An |Upgrade| header field containing the value "websocket",
 		// treated as an ASCII case-insensitive value.
-		fmt.Println("HEADERS <3:")
-		for name, values := range r.Header {
-			for _, value := range values {
-				fmt.Println(name, value)
-			}
-		}
 		upgrade := r.Header.Get("Upgrade")
 		if upgrade != "websocket" {
 			w.WriteHeader(400)
