@@ -204,7 +204,7 @@ func (ws *Ws) Handshake() error {
 		"\n\r",
 	}
 
-	return ws.write([]byte(strings.Join(lines, "\n\r")))
+	return ws.write([]byte(strings.Join(lines, "\r\n")))
 }
 
 func (ws *Ws) write(data []byte) error {
