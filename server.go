@@ -81,64 +81,7 @@ func main() {
 	})
 
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
-		// An HTTP/1.1 or higher GET request, including a "Request-URI"
-		// [RFC2616] that should be interpreted as a /resource name/
-		// defined in Section 3 (or an absolute HTTP/HTTPS URI containing
-		// the /resource name/).
-		method := r.Method
-		if method != "GET" {
-			w.WriteHeader(403)
-			fmt.Printf("forbidden method %s\n, must be 'GET'", method)
-			return
-		}
-
-		if !r.ProtoAtLeast(1, 1) {
-			w.WriteHeader(403)
-			fmt.Printf("forbidden HTTP protocol version %s\n, must be 1.1 or higher", r.Proto)
-			return
-		}
-
-		// As per RFC6455:
-		// The client includes the hostname in the |Host| header field of its
-		// handshake as per [RFC2616], so that both the client and the server
-		// can verify that they agree on which host is in use.
-		host := r.Host
-		fmt.Printf("host: %s\n", host)
-		if host != "localhost:8080" {
-			w.WriteHeader(403)
-			fmt.Printf("forbidden host: %s\n", host)
-			return
-		}
-
-		// An |Upgrade| header field containing the value "websocket",
-		// treated as an ASCII case-insensitive value.
-		upgrade := r.Header.Get("Upgrade")
-		if upgrade != "websocket" {
-			w.WriteHeader(400)
-			fmt.Printf("invalid Upgrade header %s, must be 'websocket'", upgrade)
-			return
-		}
-
-		wsKey := r.Header.Get("Sec-WebSocket-Key")
-
-		// As per RFC6455:
-		// The request MUST include a header field with the name
-		// |Sec-WebSocket-Key|.  The value of this header field MUST be a
-		// nonce consisting of a randomly selected 16-byte value that has
-		// been base64-encoded (see Section 4 of [RFC4648]).  The nonce
-		// MUST be selected randomly for each connection.
-		wsKeyBytes, err := base64.StdEncoding.DecodeString(wsKey)
-		if err != nil {
-			http.Error(w, "error decoding Sec-WebSocket-Key header", http.StatusInternalServerError)
-			return
-		}
-		if len(wsKeyBytes) != 16 {
-			http.Error(w, "invalid Sec-WebSocket-Key header, must be 16-bytes long", http.StatusBadRequest)
-			fmt.Printf("invalid Sec-WebSocket-Key header length of %d, must be 16-bytes long", len(wsKeyBytes))
-			return
-		}
-
-		err = WsHandler(w, r)
+		err := WsHandler(w, r)
 		// TODO: Change error handling because may no longer use HTTP
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -162,6 +105,11 @@ func WsHandler(w http.ResponseWriter, req *http.Request) error {
 }
 
 func handshake(w http.ResponseWriter, r *http.Request) (*Ws, error) {
+	httpStatus, err := validateWsRequest(r)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(w, err.Error(), httpStatus)
+	}
 	// As per RFC6455:
 	// For this header field [Sec-WebSocket-Key], the server has to take the value (as present
 	// in the header field, e.g., the base64-encoded [RFC4648] version minus
@@ -200,6 +148,56 @@ func handshake(w http.ResponseWriter, r *http.Request) (*Ws, error) {
 	// defer ws.conn.Close()
 
 	return ws, nil
+}
+
+func validateWsRequest(r *http.Request) (int, error) {
+	// An HTTP/1.1 or higher GET request, including a "Request-URI"
+	// [RFC2616] that should be interpreted as a /resource name/
+	// defined in Section 3 (or an absolute HTTP/HTTPS URI containing
+	// the /resource name/).
+	method := r.Method
+	if method != "GET" {
+		return http.StatusForbidden, fmt.Errorf("forbidden method %s\n, must be 'GET'", method)
+	}
+
+	if !r.ProtoAtLeast(1, 1) {
+		return http.StatusForbidden, fmt.Errorf("forbidden HTTP protocol version %s\n, must be 1.1 or higher", r.Proto)
+	}
+
+	// As per RFC6455:
+	// The client includes the hostname in the |Host| header field of its
+	// handshake as per [RFC2616], so that both the client and the server
+	// can verify that they agree on which host is in use.
+	host := r.Host
+	fmt.Printf("host: %s\n", host)
+	if host != "localhost:8080" {
+		return http.StatusForbidden, fmt.Errorf("forbidden host: %s\n", host)
+	}
+
+	// An |Upgrade| header field containing the value "websocket",
+	// treated as an ASCII case-insensitive value.
+	upgrade := r.Header.Get("Upgrade")
+	if upgrade != "websocket" {
+		return http.StatusBadRequest, fmt.Errorf("invalid Upgrade header %s, must be 'websocket'", upgrade)
+	}
+
+	wsKey := r.Header.Get("Sec-WebSocket-Key")
+
+	// As per RFC6455:
+	// The request MUST include a header field with the name
+	// |Sec-WebSocket-Key|.  The value of this header field MUST be a
+	// nonce consisting of a randomly selected 16-byte value that has
+	// been base64-encoded (see Section 4 of [RFC4648]).  The nonce
+	// MUST be selected randomly for each connection.
+	wsKeyBytes, err := base64.StdEncoding.DecodeString(wsKey)
+	if err != nil {
+		return http.StatusInternalServerError, errors.New("error decoding Sec-WebSocket-Key header")
+	}
+	if len(wsKeyBytes) != 16 {
+		return http.StatusBadRequest, fmt.Errorf("invalid Sec-WebSocket-Key header length of %d, must be 16-bytes long", len(wsKeyBytes))
+	}
+
+	return 0, nil
 }
 
 func (ws *Ws) write(data []byte) error {
