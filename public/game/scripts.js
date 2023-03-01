@@ -27,7 +27,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         ws.onopen = () => {
             console.log("websocket open <3")
-            ws.send(name)
+            ws.send(`${name}`)
+        }
+
+        ws.onmessage = (e) => {
+            console.log("ws data <3:")
+            console.dir(e.data)
         }
     }
 
