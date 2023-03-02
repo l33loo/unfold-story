@@ -96,10 +96,16 @@ func main() {
 }
 
 func WsHandler(w http.ResponseWriter, req *http.Request) error {
-	_, err := handshake(w, req)
+	ws, err := handshake(w, req)
 	if err != nil {
 		return err
 	}
+
+	// Frame
+	ws.Send("hello, this is Lila's ws server <3")
+
+	// not frame
+	ws.write([]byte("hello websocket <3"))
 
 	return nil
 }
@@ -206,6 +212,25 @@ func (ws *Ws) write(data []byte) error {
 		return err
 	}
 	return ws.bufrw.Flush()
+}
+
+func (ws *Ws) Send(msg string) {
+	pay := []byte(msg)
+	payLen := len(pay)
+
+	// FIN (1): 1
+	// RSV1 (1): 0
+	// RSV2 (1): 0
+	// RSV3 (1): 0
+	// OPCODE (4) - TEXT: 0001
+	// MASKED (1): 0
+	// PAYLOAD LENGTH (7+): payLen
+
+	firstTwo := []byte{129, byte(payLen)}
+	data := firstTwo[0:]
+	data = append(data, pay...)
+
+	ws.write(data)
 }
 
 type Ws struct {
