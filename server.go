@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha1"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -218,19 +220,58 @@ func (ws *Ws) Send(msg string) {
 	pay := []byte(msg)
 	payLen := len(pay)
 
-	// FIN (1): 1
-	// RSV1 (1): 0
-	// RSV2 (1): 0
-	// RSV3 (1): 0
-	// OPCODE (4) - TEXT: 0001
-	// MASKED (1): 0
-	// PAYLOAD LENGTH (7+): payLen
+	var fin uint8 = 1
+	var rsv1 uint8 = 0
+	var rsv2 uint8 = 0
+	var rsv3 uint8 = 0
+	var upcode uint8 = 1
+	var masked uint8 = 0
 
-	firstTwo := []byte{129, byte(payLen)}
-	data := firstTwo[0:]
-	data = append(data, pay...)
+	frame := new(bytes.Buffer)
+	byte1 := (fin << 7) | (rsv1 << 6) | (rsv2 << 5) | (rsv3 << 4) | upcode
+	err := frame.WriteByte(byte1)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	ws.write(data)
+	switch {
+	case payLen < 126:
+		// 7 bits to denote payload length (in bytes)
+		byte2 := (masked << 7) | uint8(payLen)
+		err = frame.WriteByte(byte2)
+		if err != nil {
+			log.Fatal(err)
+		}
+	case payLen < (1 << 16):
+		// 7+16 bits
+		byte2 := (masked << 7) | (uint8(126))
+		err = frame.WriteByte(byte2)
+		if err != nil {
+			log.Fatal(err)
+		}
+		bytes34 := uint16(payLen)
+		err = binary.Write(frame, binary.BigEndian, bytes34)
+		if err != nil {
+			log.Fatal(err)
+		}
+	default:
+		// 7+64 bits
+		byte2 := (masked << 7) | (uint8(127))
+		err = frame.WriteByte(byte2)
+		if err != nil {
+			log.Fatal(err)
+		}
+		nextBytes := uint64(payLen)
+		err = binary.Write(frame, binary.BigEndian, nextBytes)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+	_, err = frame.Write(pay)
+	if err != nil {
+		log.Fatal(err)
+	}
+	ws.write(frame.Bytes())
 }
 
 type Ws struct {
