@@ -1,2 +1,5 @@
 # binaries
 ./server
+
+# wireshark capture
+/wireshark
