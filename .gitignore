@@ -2,4 +2,4 @@
 ./server
 
 # wireshark capture
-/wireshark
+wireshark/
