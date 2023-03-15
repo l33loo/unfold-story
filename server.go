@@ -112,7 +112,17 @@ func WsHandler(w http.ResponseWriter, req *http.Request) error {
 	// not frame
 	ws.write([]byte("hello websocket <3"))
 
-	return nil
+	for {
+		msg, err := ws.Recv()
+		fmt.Print("websocket msg <3: ", msg)
+
+		if err != nil {
+			// close connection
+			return err
+		}
+	}
+
+	// return nil
 }
 
 func handshake(w http.ResponseWriter, r *http.Request) (*Ws, error) {
@@ -219,6 +229,100 @@ func (ws *Ws) write(data []byte) error {
 	return ws.bufrw.Flush()
 }
 
+func (ws *Ws) read(buf []byte) error {
+	_, err := ws.bufrw.Read(buf)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (ws *Ws) Recv() (string, error) {
+	// TODO: opcode, fail if RSV values are ot 0,
+	// fail if not masked, unmask
+	head := make([]byte, 112)
+	err := ws.read(head)
+	if err != nil {
+		return "", err
+	}
+	parsedFrame, _ := parseFrameHead(head)
+	// msg := umaskPayload(frame Frame)
+	msg := string(parsedFrame.payload)
+	return msg, nil
+}
+
+func parseFrameHead(frame []byte) (Frame, int) {
+	parsedFrame := Frame{}
+
+	var byte1 uint8 = frame[0]
+	parsedFrame.fin = byte1 >> 7
+	parsedFrame.rsv1 = ((1 << 6) & byte1) >> 6
+	parsedFrame.rsv2 = ((1 << 5) & byte1) >> 5
+	parsedFrame.rsv3 = ((1 << 4) & byte1) >> 4
+	parsedFrame.opcode = 16 & byte1
+
+	var byte2 uint8 = frame[1]
+	parsedFrame.mask = byte2 >> 7
+	parsedFrame.payLen = 128 & byte2
+
+	currentIdx := 1
+
+	if parsedFrame.payLen == 126 {
+		var byte3 = uint16(frame[2])
+		var byte4 = uint16(frame[3])
+		parsedFrame.extPayLen1 = (byte3 << 8) | byte4
+		currentIdx += 2
+	}
+
+	if parsedFrame.payLen == 127 {
+		var acc uint64
+		for i := 1; i <= 8; i++ {
+			shift := 8 * (8 - i)
+			next := uint64(frame[i+1])
+			acc = (next << shift) | acc
+		}
+		parsedFrame.extPayLen2 = acc
+		currentIdx += 8
+	}
+
+	if parsedFrame.mask == 1 {
+		var acc uint32
+		for i := 1; i <= 4; i++ {
+			shift := 8 * (4 - i)
+			next := uint32(frame[currentIdx+i])
+			acc = (next << shift) | acc
+		}
+		parsedFrame.maskKey = acc
+		currentIdx += 4
+	}
+
+	return parsedFrame, currentIdx + 1
+}
+
+func getPayloadLength(parsedFrame Frame) int {
+	if parsedFrame.payLen < 126 {
+		return int(parsedFrame.payLen)
+	}
+
+	if parsedFrame.payLen == 126 {
+		return int(parsedFrame.extPayLen1)
+	}
+
+	return int(parsedFrame.extPayLen2)
+}
+
+func parseFramePayload(frame []byte, parsedFrame Frame, idx int) {
+	parsedFrame.payload = frame[idx:]
+}
+
+// func umaskPayload(frame Frame) string {
+
+// }
+
+// func validateAndReturnFrame(frame Frame) error {
+
+// }
+
 func (ws *Ws) Send(msg string) error {
 	pay := []byte(msg)
 	payLen := len(pay)
@@ -282,4 +386,18 @@ type Ws struct {
 	conn    net.Conn
 	bufrw   *bufio.ReadWriter
 	request *http.Request
+}
+
+type Frame struct {
+	fin        uint8
+	rsv1       uint8
+	rsv2       uint8
+	rsv3       uint8
+	opcode     uint8
+	mask       uint8
+	payLen     uint8
+	extPayLen1 uint16
+	extPayLen2 uint64
+	maskKey    uint32
+	payload    []byte
 }
