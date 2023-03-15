@@ -240,18 +240,65 @@ func (ws *Ws) read(buf []byte) error {
 func (ws *Ws) Recv() (string, error) {
 	// TODO: opcode, fail if RSV values are ot 0,
 	// fail if not masked, unmask
-	head := make([]byte, 112)
-	err := ws.read(head)
+	head1 := make([]byte, 2)
+	err := ws.read(head1)
 	if err != nil {
 		return "", err
 	}
-	parsedFrame, _ := parseFrameHead(head)
+	parsedFrame := parseFrameHead(head1)
+	// TODO: validate rsv1, rsv2, rsv3, and mask
+	if parsedFrame.payLen == 126 {
+		head2 := make([]byte, 2)
+		err = ws.read(head2)
+		if err != nil {
+			return "", err
+		}
+		var byte1 = uint16(head2[0])
+		var byte2 = uint16(head2[1])
+		parsedFrame.extPayLen1 = (byte1 << 8) | byte2
+	}
+	if parsedFrame.payLen == 127 {
+		head2 := make([]byte, 8)
+		err = ws.read(head2)
+		if err != nil {
+			return "", err
+		}
+		var acc uint64
+		for i := 0; i < 8; i++ {
+			shift := 8 * (7 - i)
+			next := uint64(head2[i])
+			acc = (next << shift) | acc
+		}
+		parsedFrame.extPayLen2 = acc
+	}
+	maskKey := make([]byte, 4)
+	err = ws.read(maskKey)
+	if err != nil {
+		return "", err
+	}
+	var acc uint32
+	for i := 0; i < 4; i++ {
+		shift := 8 * (3 - i)
+		next := uint32(maskKey[i])
+		acc = (next << shift) | acc
+	}
+	parsedFrame.maskKey = acc
+
+	payLen := getPayloadLength(parsedFrame)
+	pay := make([]byte, payLen)
+	// TODO: handle EOF
+	err = ws.read(pay)
+	if err != nil {
+		return "", err
+	}
+	parsedFrame.payload = pay
+	fmt.Print(parsedFrame)
 	// msg := umaskPayload(frame Frame)
 	msg := string(parsedFrame.payload)
 	return msg, nil
 }
 
-func parseFrameHead(frame []byte) (Frame, int) {
+func parseFrameHead(frame []byte) Frame {
 	parsedFrame := Frame{}
 
 	var byte1 uint8 = frame[0]
@@ -259,44 +306,13 @@ func parseFrameHead(frame []byte) (Frame, int) {
 	parsedFrame.rsv1 = ((1 << 6) & byte1) >> 6
 	parsedFrame.rsv2 = ((1 << 5) & byte1) >> 5
 	parsedFrame.rsv3 = ((1 << 4) & byte1) >> 4
-	parsedFrame.opcode = 16 & byte1
+	parsedFrame.opcode = 0x01 & byte1
 
 	var byte2 uint8 = frame[1]
 	parsedFrame.mask = byte2 >> 7
-	parsedFrame.payLen = 128 & byte2
+	parsedFrame.payLen = 0x7f & byte2
 
-	currentIdx := 1
-
-	if parsedFrame.payLen == 126 {
-		var byte3 = uint16(frame[2])
-		var byte4 = uint16(frame[3])
-		parsedFrame.extPayLen1 = (byte3 << 8) | byte4
-		currentIdx += 2
-	}
-
-	if parsedFrame.payLen == 127 {
-		var acc uint64
-		for i := 1; i <= 8; i++ {
-			shift := 8 * (8 - i)
-			next := uint64(frame[i+1])
-			acc = (next << shift) | acc
-		}
-		parsedFrame.extPayLen2 = acc
-		currentIdx += 8
-	}
-
-	if parsedFrame.mask == 1 {
-		var acc uint32
-		for i := 1; i <= 4; i++ {
-			shift := 8 * (4 - i)
-			next := uint32(frame[currentIdx+i])
-			acc = (next << shift) | acc
-		}
-		parsedFrame.maskKey = acc
-		currentIdx += 4
-	}
-
-	return parsedFrame, currentIdx + 1
+	return parsedFrame
 }
 
 func getPayloadLength(parsedFrame Frame) int {
