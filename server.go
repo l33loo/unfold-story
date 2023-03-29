@@ -114,7 +114,7 @@ func WsHandler(w http.ResponseWriter, req *http.Request) error {
 
 	for {
 		msg, err := ws.Recv()
-		fmt.Print("websocket msg <3: ", msg)
+		fmt.Printf("websocket msg <3: %s\n", msg)
 
 		if err != nil {
 			// close connection
@@ -276,13 +276,8 @@ func (ws *Ws) Recv() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var acc uint32
-	for i := 0; i < 4; i++ {
-		shift := 8 * (3 - i)
-		next := uint32(maskKey[i])
-		acc = (next << shift) | acc
-	}
-	parsedFrame.maskKey = acc
+
+	parsedFrame.maskKey = maskKey
 
 	payLen := getPayloadLength(parsedFrame)
 	pay := make([]byte, payLen)
@@ -292,9 +287,9 @@ func (ws *Ws) Recv() (string, error) {
 		return "", err
 	}
 	parsedFrame.payload = pay
-	fmt.Print(parsedFrame)
-	// msg := umaskPayload(frame Frame)
-	msg := string(parsedFrame.payload)
+	fmt.Println(parsedFrame)
+	unmasked := unmaskPayload(parsedFrame)
+	msg := string(unmasked)
 	return msg, nil
 }
 
@@ -331,9 +326,20 @@ func parseFramePayload(frame []byte, parsedFrame Frame, idx int) {
 	parsedFrame.payload = frame[idx:]
 }
 
-// func umaskPayload(frame Frame) string {
-
-// }
+func unmaskPayload(frame Frame) []byte {
+	key := frame.maskKey
+	unmasked := make([]byte, len(frame.payload))
+	keyIdx := 0
+	for _, e := range frame.payload {
+		unmasked = append(unmasked, e^key[keyIdx])
+		if keyIdx == len(key)-1 {
+			keyIdx = 0
+			continue
+		}
+		keyIdx++
+	}
+	return unmasked
+}
 
 // func validateAndReturnFrame(frame Frame) error {
 
@@ -414,6 +420,6 @@ type Frame struct {
 	payLen     uint8
 	extPayLen1 uint16
 	extPayLen2 uint64
-	maskKey    uint32
+	maskKey    []byte
 	payload    []byte
 }
