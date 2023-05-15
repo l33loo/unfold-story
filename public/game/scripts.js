@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const name = nameInput.value
         localStorage.setItem("name", name)
 
+        const playerList = document.getElementsByTagName("ul")[0]
+
         // We can’t use XMLHttpRequest or fetch to make this kind of HTTP-request,
         // because JavaScript is not allowed to set these headers.
         // https://javascript.info/websocket
@@ -33,6 +35,10 @@ document.addEventListener("DOMContentLoaded", () => {
         ws.onmessage = (e) => {
             console.log("ws data <3:")
             console.dir(e.data)
+
+            const playerItem = document.createElement("li")
+            playerItem.textContent = e.data
+            playerList.appendChild(playerItem)
         }
     }
 
