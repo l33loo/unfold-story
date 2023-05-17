@@ -132,7 +132,7 @@ func broadcast() {
 }
 
 func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) error {
-	defer ws.conn.Close()
+	defer ws.Close()
 
 	// Frame
 	// A long message to test endianness
@@ -151,27 +151,34 @@ func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) error {
 	messages <- who + " has arrived"
 	entering <- ch
 
-	// need to be able to stop the loop
+loop:
 	for {
 		msg, err := ws.Recv()
+		if err != nil {
+			switch err {
+			case io.EOF:
+				fmt.Println("end of file <3")
+				break loop
+			default:
+				fmt.Println("closing error <3")
+				fmt.Println(err.Error())
+				break loop
+			}
+		}
+
 		fmt.Printf("websocket msg <3: %s\n", msg)
 		messages <- msg
-
-		if err != nil {
-			// close connection
-			ws.conn.Close()
-			return err
-		}
 	}
 
-	// leaving <- ch
-	// messages <- who + " has left"
-	// return nil
+	fmt.Println("leaving <3")
+	leaving <- ch
+	messages <- who + " has left"
+	return nil
 }
 
 func clientWriter(ws *Ws, ch <-chan string) {
 	for msg := range ch {
-		err := ws.Send(msg)
+		err := ws.Send(msg, false)
 		if err != nil {
 			log.Fatal(err)
 			// Send HTTP error code
@@ -276,6 +283,18 @@ func validateWsRequest(r *http.Request) (int, error) {
 	return 0, nil
 }
 
+func (ws *Ws) Close() {
+	err := ws.Send("", true)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = ws.conn.Close()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
 func (ws *Ws) write(data []byte) error {
 	_, err := ws.bufrw.Write(data)
 	if err != nil {
@@ -344,8 +363,7 @@ func (ws *Ws) Recv() (string, error) {
 	parsedFrame.payload = pay
 	fmt.Println(parsedFrame)
 	unmasked := unmaskPayload(parsedFrame)
-	msg := string(unmasked)
-	return msg, nil
+	return unmasked, nil
 }
 
 func parseFrameHead(frame []byte) Frame {
@@ -381,26 +399,32 @@ func parseFramePayload(frame []byte, parsedFrame Frame, idx int) {
 	parsedFrame.payload = frame[idx:]
 }
 
-func unmaskPayload(frame Frame) []byte {
+func unmaskPayload(frame Frame) string {
+	fmt.Println("frame.payLen <3:")
+	fmt.Println(frame.payLen)
 	key := frame.maskKey
-	unmasked := make([]byte, len(frame.payload))
+	unmasked := make([]byte, frame.payLen)
 	keyIdx := 0
-	for _, e := range frame.payload {
-		unmasked = append(unmasked, e^key[keyIdx])
+	for i, e := range frame.payload {
+		unmasked[i] = e ^ key[keyIdx]
 		if keyIdx == len(key)-1 {
 			keyIdx = 0
 			continue
 		}
 		keyIdx++
 	}
-	return unmasked
+	fmt.Println("unmasked <3")
+	fmt.Println(unmasked)
+	fmt.Println(string(unmasked))
+	fmt.Println(len(string(unmasked)))
+	return string(unmasked)
 }
 
 // func validateAndReturnFrame(frame Frame) error {
 
 // }
 
-func (ws *Ws) Send(msg string) error {
+func (ws *Ws) Send(msg string, toClose bool) error {
 	pay := []byte(msg)
 	payLen := len(pay)
 
@@ -408,11 +432,15 @@ func (ws *Ws) Send(msg string) error {
 	var rsv1 uint8 = 0
 	var rsv2 uint8 = 0
 	var rsv3 uint8 = 0
-	var upcode uint8 = 1
+	var opcode uint8 = 1
 	var masked uint8 = 0
 
+	if toClose {
+		opcode = 0x8
+	}
+
 	frame := new(bytes.Buffer)
-	byte1 := (fin << 7) | (rsv1 << 6) | (rsv2 << 5) | (rsv3 << 4) | upcode
+	byte1 := (fin << 7) | (rsv1 << 6) | (rsv2 << 5) | (rsv3 << 4) | opcode
 	err := frame.WriteByte(byte1)
 	if err != nil {
 		return err
