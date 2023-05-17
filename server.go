@@ -16,8 +16,6 @@ import (
 	"strings"
 )
 
-var testConn net.Conn
-
 func main() {
 	go broadcast()
 
@@ -234,9 +232,6 @@ func handshake(w http.ResponseWriter, r *http.Request) (*Ws, error) {
 	}
 
 	ws := &Ws{conn, bufwr, r}
-	testConn = ws.conn
-	// defer ws.conn.Close()
-
 	return ws, nil
 }
 
@@ -324,7 +319,7 @@ func (ws *Ws) read(buf []byte) error {
 }
 
 func (ws *Ws) Recv() (string, uint8, error) {
-	// TODO: opcode, fail if RSV values are ot 0,
+	// TODO: opcode, fail if RSV values are not 0,
 	// fail if not masked, unmask
 	head1 := make([]byte, 2)
 	err := ws.read(head1)
@@ -367,7 +362,7 @@ func (ws *Ws) Recv() (string, uint8, error) {
 
 	payLen := getPayloadLength(parsedFrame)
 	pay := make([]byte, payLen)
-	// TODO: handle EOF
+
 	err = ws.read(pay)
 	if err != nil {
 		return "", 0, err
