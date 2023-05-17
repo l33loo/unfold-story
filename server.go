@@ -121,6 +121,7 @@ func broadcast() {
 		case cli := <-entering:
 			clients[cli] = true
 		case msg := <-messages:
+			fmt.Printf("MESSAGE <3: %s\n", msg)
 			for cli := range clients {
 				cli <- msg
 			}
@@ -153,7 +154,7 @@ func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) error {
 
 loop:
 	for {
-		msg, err := ws.Recv()
+		msg, opcode, err := ws.Recv()
 		if err != nil {
 			switch err {
 			case io.EOF:
@@ -164,13 +165,21 @@ loop:
 				fmt.Println(err.Error())
 				break loop
 			}
+		} else if opcode == 0x9 {
+			// If receive PING, send PONG back
+			// if the connection wasn't closed,
+			// TODO: sending back the same Application
+			// Data from the PING
+			ws.Pong()
 		}
 
-		fmt.Printf("websocket msg <3: %s\n", msg)
-		messages <- msg
+		// Make sure to broadcast only text messages,
+		// not Control frames like Close, Ping, and Pong
+		if opcode == 1 {
+			messages <- msg
+		}
 	}
 
-	fmt.Println("leaving <3")
 	leaving <- ch
 	messages <- who + " has left"
 	return nil
@@ -178,7 +187,7 @@ loop:
 
 func clientWriter(ws *Ws, ch <-chan string) {
 	for msg := range ch {
-		err := ws.Send(msg, false)
+		err := ws.SendMsg(msg)
 		if err != nil {
 			log.Fatal(err)
 			// Send HTTP error code
@@ -223,8 +232,6 @@ func handshake(w http.ResponseWriter, r *http.Request) (*Ws, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	log.Println("HERE! <3")
 
 	ws := &Ws{conn, bufwr, r}
 	testConn = ws.conn
@@ -284,7 +291,7 @@ func validateWsRequest(r *http.Request) (int, error) {
 }
 
 func (ws *Ws) Close() {
-	err := ws.Send("", true)
+	err := ws.Send("", 0x8)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -293,6 +300,11 @@ func (ws *Ws) Close() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func (ws *Ws) SendMsg(msg string) error {
+	err := ws.Send(msg, 1)
+	return err
 }
 
 func (ws *Ws) write(data []byte) error {
@@ -311,13 +323,13 @@ func (ws *Ws) read(buf []byte) error {
 	return nil
 }
 
-func (ws *Ws) Recv() (string, error) {
+func (ws *Ws) Recv() (string, uint8, error) {
 	// TODO: opcode, fail if RSV values are ot 0,
 	// fail if not masked, unmask
 	head1 := make([]byte, 2)
 	err := ws.read(head1)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	parsedFrame := parseFrameHead(head1)
 	// TODO: validate rsv1, rsv2, rsv3, and mask
@@ -325,7 +337,7 @@ func (ws *Ws) Recv() (string, error) {
 		head2 := make([]byte, 2)
 		err = ws.read(head2)
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 		var byte1 = uint16(head2[0])
 		var byte2 = uint16(head2[1])
@@ -335,7 +347,7 @@ func (ws *Ws) Recv() (string, error) {
 		head2 := make([]byte, 8)
 		err = ws.read(head2)
 		if err != nil {
-			return "", err
+			return "", 0, err
 		}
 		var acc uint64
 		for i := 0; i < 8; i++ {
@@ -348,7 +360,7 @@ func (ws *Ws) Recv() (string, error) {
 	maskKey := make([]byte, 4)
 	err = ws.read(maskKey)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 
 	parsedFrame.maskKey = maskKey
@@ -358,12 +370,11 @@ func (ws *Ws) Recv() (string, error) {
 	// TODO: handle EOF
 	err = ws.read(pay)
 	if err != nil {
-		return "", err
+		return "", 0, err
 	}
 	parsedFrame.payload = pay
-	fmt.Println(parsedFrame)
 	unmasked := unmaskPayload(parsedFrame)
-	return unmasked, nil
+	return unmasked, parsedFrame.opcode, nil
 }
 
 func parseFrameHead(frame []byte) Frame {
@@ -400,8 +411,6 @@ func parseFramePayload(frame []byte, parsedFrame Frame, idx int) {
 }
 
 func unmaskPayload(frame Frame) string {
-	fmt.Println("frame.payLen <3:")
-	fmt.Println(frame.payLen)
 	key := frame.maskKey
 	unmasked := make([]byte, frame.payLen)
 	keyIdx := 0
@@ -413,18 +422,21 @@ func unmaskPayload(frame Frame) string {
 		}
 		keyIdx++
 	}
-	fmt.Println("unmasked <3")
-	fmt.Println(unmasked)
-	fmt.Println(string(unmasked))
-	fmt.Println(len(string(unmasked)))
-	return string(unmasked)
+
+	unmaskedStr := string(unmasked)
+	return unmaskedStr
 }
 
 // func validateAndReturnFrame(frame Frame) error {
 
 // }
 
-func (ws *Ws) Send(msg string, toClose bool) error {
+func (ws *Ws) Pong() {
+	// TODO: send same application data back from PING
+	ws.Send("PONG", 0xA)
+}
+
+func (ws *Ws) Send(msg string, opcd uint8) error {
 	pay := []byte(msg)
 	payLen := len(pay)
 
@@ -432,15 +444,12 @@ func (ws *Ws) Send(msg string, toClose bool) error {
 	var rsv1 uint8 = 0
 	var rsv2 uint8 = 0
 	var rsv3 uint8 = 0
-	var opcode uint8 = 1
+	var opcode uint8 = opcd
 	var masked uint8 = 0
-
-	if toClose {
-		opcode = 0x8
-	}
 
 	frame := new(bytes.Buffer)
 	byte1 := (fin << 7) | (rsv1 << 6) | (rsv2 << 5) | (rsv3 << 4) | opcode
+	log.Println(byte1)
 	err := frame.WriteByte(byte1)
 	if err != nil {
 		return err
