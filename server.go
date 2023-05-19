@@ -6,6 +6,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -104,6 +105,13 @@ func main() {
 	}
 }
 
+type Message struct {
+	Join     string `json:",omitempty"`
+	Entering string `json:",omitempty"`
+	Leaving  string `json:",omitempty"`
+	Line     string `json:",omitempty"`
+}
+
 type client chan<- string
 
 var (
@@ -146,8 +154,21 @@ func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) error {
 	go clientWriter(ws, ch)
 
 	who := ws.conn.RemoteAddr().String()
-	ch <- "You are " + who
-	messages <- who + " has arrived"
+	j, err := json.Marshal(Message{Join: who})
+	if err != nil {
+		// TODO
+		log.Fatal(err)
+	}
+	e, err := json.Marshal(Message{Entering: who})
+	log.Print("HELLO ENTERING <3:")
+	log.Print(string(e))
+	if err != nil {
+		// TODO
+		log.Fatal(err)
+	}
+
+	ch <- string(j)
+	messages <- string(e)
 	entering <- ch
 
 loop:
@@ -174,12 +195,22 @@ loop:
 		// Make sure to broadcast only text messages,
 		// not Control frames like Close, Ping, and Pong
 		if opcode == 1 {
-			messages <- msg
+			m, err := json.Marshal(Message{Line: msg})
+			if err != nil {
+				// TODO
+				log.Fatal(err)
+			}
+			messages <- string(m)
 		}
 	}
 
+	l, err := json.Marshal(Message{Leaving: who})
+	if err != nil {
+		// TODO
+		log.Fatal(err)
+	}
 	leaving <- ch
-	messages <- who + " has left"
+	messages <- string(l)
 	return nil
 }
 
