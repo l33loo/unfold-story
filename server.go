@@ -195,12 +195,8 @@ loop:
 		// Make sure to broadcast only text messages,
 		// not Control frames like Close, Ping, and Pong
 		if opcode == 1 {
-			m, err := json.Marshal(Message{Line: msg})
-			if err != nil {
-				// TODO
-				log.Fatal(err)
-			}
-			messages <- string(m)
+			log.Println(msg)
+			messages <- string(msg)
 		}
 	}
 
