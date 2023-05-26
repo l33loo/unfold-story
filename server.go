@@ -106,10 +106,12 @@ func main() {
 }
 
 type Message struct {
-	Join     string `json:",omitempty"`
-	Entering string `json:",omitempty"`
-	Leaving  string `json:",omitempty"`
-	Line     string `json:",omitempty"`
+	Join      string `json:",omitempty"`
+	Entering  string `json:",omitempty"`
+	Leaving   string `json:",omitempty"`
+	Line      string `json:",omitempty"`
+	EmptyLine bool   `json:",omitempty"`
+	Start     bool   `json:",omitempty"`
 }
 
 type client chan<- string
@@ -122,17 +124,57 @@ var (
 
 func broadcast() {
 	clients := make(map[client]bool)
+	var playerOrder []client
+	playerTurn := 0
 	for {
 		select {
 		case cli := <-entering:
 			clients[cli] = true
+			if len(playerOrder) == 0 {
+				m, err := json.Marshal(Message{Start: true})
+				if err != nil {
+					// TODO
+					log.Fatal(err)
+				}
+				cli <- string(m)
+			}
+			playerOrder = append(playerOrder, cli)
 		case msg := <-messages:
-			fmt.Printf("MESSAGE <3: %s\n", msg)
+			if len(playerOrder) == 0 {
+				continue
+			}
+			log.Print("PLAYERS!!! <3 ", playerTurn, playerOrder)
+			c := playerOrder[playerTurn]
+			// fmt.Printf("MESSAGE <3: %s\n", msg)
 			for cli := range clients {
-				cli <- msg
+				if c == cli {
+					cli <- msg
+					if playerTurn == len(playerOrder)-1 {
+						playerTurn = 0
+					} else {
+						playerTurn++
+					}
+				} else {
+					e, err := json.Marshal(Message{EmptyLine: true})
+					if err != nil {
+						// TODO
+						log.Fatal(err)
+					}
+					cli <- string(e)
+				}
 			}
 		case cli := <-leaving:
 			delete(clients, cli)
+			for i, c := range playerOrder {
+				if c == cli {
+					playerOrder = append(playerOrder[:i], playerOrder[i+1:]...)
+					if playerTurn == 0 {
+						playerTurn = len(playerOrder) - 1
+					} else {
+						playerTurn--
+					}
+				}
+			}
 			close(cli)
 		}
 	}
@@ -174,6 +216,7 @@ func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) error {
 loop:
 	for {
 		msg, opcode, err := ws.Recv()
+
 		if err != nil {
 			switch err {
 			case io.EOF:
