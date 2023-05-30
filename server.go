@@ -105,68 +105,101 @@ func main() {
 	}
 }
 
-type Message struct {
-	Join      string `json:",omitempty"`
-	Entering  string `json:",omitempty"`
-	Leaving   string `json:",omitempty"`
-	Line      string `json:",omitempty"`
-	EmptyLine bool   `json:",omitempty"`
-	Start     bool   `json:",omitempty"`
+// The server shouldn't be looking inside the message.
+// It just routes messages to the expected recipients,
+// and disables joining once the game has started.
+// The browser sends arbitrary json as string.
+
+type ServerMessage struct {
+	// Forward is a message sent from a client that's being forwarded to another
+	Forward string `json:",omitempty"`
+	// Players is to alert who is already connected. Use to check if a given
+	// player is the first one.
+	// TODO: make array of strings with usernames
+	Players []Player `json:",omitempty"`
+	// Send all the lines at the end of games
+	TheEnd []string `json:",omitempty"`
 }
 
-type client chan<- string
+type ClientMessage struct {
+	// NewPlayer serves for a new player to send its name
+	NewPlayer string `json:",omitempty"`
+	Start     bool   `json:",omitempty"`
+	// Broadcast is an arbitrary message from the server used for joining, leaving,
+	// status updates (who wrote which line)
+	// The client sends arbitrary JSON as string
+	Broadcast string `json:",omitempty"`
+	// NextPlayer is the latest game line sent to the next player
+	NextPlayer string `json:",omitempty"`
+}
+
+type MessageChan struct {
+	Message ClientMessage
+	Client  client
+}
+
+type Player struct {
+	Client   client
+	UserName string
+}
+
+type client chan ServerMessage
 
 var (
-	entering = make(chan client)
-	messages = make(chan string)
+	entering = make(chan Player)
+	// TODO: make messages channel unmarshalled struct
+	messages = make(chan MessageChan)
 	leaving  = make(chan client)
 )
 
+// func handleNewPlayer() {
+
+// }
+
 func broadcast() {
-	clients := make(map[client]bool)
-	var playerOrder []client
+	var playerOrder []Player
 	playerTurn := 0
 	for {
 		select {
 		case cli := <-entering:
-			clients[cli] = true
-			if len(playerOrder) == 0 {
-				m, err := json.Marshal(Message{Start: true})
-				if err != nil {
-					// TODO
-					log.Fatal(err)
-				}
-				cli <- string(m)
-			}
-			playerOrder = append(playerOrder, cli)
+			log.Print(cli)
+			cli.Client <- ServerMessage{Players: playerOrder}
+			log.Print(playerOrder, playerTurn)
 		case msg := <-messages:
-			if len(playerOrder) == 0 {
-				continue
-			}
-			log.Print("PLAYERS!!! <3 ", playerTurn, playerOrder)
-			c := playerOrder[playerTurn]
-			// fmt.Printf("MESSAGE <3: %s\n", msg)
-			for cli := range clients {
-				if c == cli {
-					cli <- msg
-					if playerTurn == len(playerOrder)-1 {
-						playerTurn = 0
-					} else {
-						playerTurn++
-					}
-				} else {
-					e, err := json.Marshal(Message{EmptyLine: true})
-					if err != nil {
-						// TODO
-						log.Fatal(err)
-					}
-					cli <- string(e)
+			switch {
+			case msg.Message.NewPlayer != "":
+				// TODO: fxn call...
+				playerOrder = append(playerOrder, Player{Client: msg.Client, UserName: msg.Message.NewPlayer})
+				for _, cli := range playerOrder {
+					cli.Client <- ServerMessage{Players: playerOrder}
 				}
+			case msg.Message.Broadcast != "":
+				// TODO: fxn call...
+				for _, cli := range playerOrder {
+					cli.Client <- ServerMessage{Forward: msg.Message.Broadcast}
+				}
+			case msg.Message.NextPlayer != "":
+				// TODO: fxn call...
+				c := playerOrder[playerTurn]
+				for _, cli := range playerOrder {
+					if c.Client == cli.Client {
+						if playerTurn == len(playerOrder)-1 {
+							playerTurn = 0
+						} else {
+							playerTurn++
+						}
+					}
+					cli.Client <- ServerMessage{Forward: msg.Message.NewPlayer}
+				}
+				// case msg.Message.Start:
+				// 	// TODO: fxn call...
 			}
+
+			log.Print("msg <3 ", msg)
+			log.Print(playerOrder, playerTurn)
 		case cli := <-leaving:
-			delete(clients, cli)
 			for i, c := range playerOrder {
-				if c == cli {
+				if c.Client == cli {
 					playerOrder = append(playerOrder[:i], playerOrder[i+1:]...)
 					if playerTurn == 0 {
 						playerTurn = len(playerOrder) - 1
@@ -174,6 +207,7 @@ func broadcast() {
 						playerTurn--
 					}
 				}
+				c.Client <- ServerMessage{Players: playerOrder}
 			}
 			close(cli)
 		}
@@ -192,31 +226,17 @@ func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) error {
 	// not frame
 	// ws.write([]byte("hello websocket <3"))
 
-	ch := make(chan string)
+	ch := make(client)
 	go clientWriter(ws, ch)
 
-	who := ws.conn.RemoteAddr().String()
-	j, err := json.Marshal(Message{Join: who})
-	if err != nil {
-		// TODO
-		log.Fatal(err)
-	}
-	e, err := json.Marshal(Message{Entering: who})
-	log.Print("HELLO ENTERING <3:")
-	log.Print(string(e))
-	if err != nil {
-		// TODO
-		log.Fatal(err)
-	}
-
-	ch <- string(j)
-	messages <- string(e)
-	entering <- ch
+	// who := ws.conn.RemoteAddr().String()
+	// ch <- ServerMessage{Players: []}
+	// messages <- MessageChan{Client: ch, Message: ClientMessage{}}
+	entering <- Player{Client: ch, UserName: ""}
 
 loop:
 	for {
 		msg, opcode, err := ws.Recv()
-
 		if err != nil {
 			switch err {
 			case io.EOF:
@@ -227,35 +247,45 @@ loop:
 				fmt.Println(err.Error())
 				break loop
 			}
-		} else if opcode == 0x9 {
+		}
+
+		if opcode == 0x9 {
 			// If receive PING, send PONG back
 			// if the connection wasn't closed,
 			// TODO: sending back the same Application
 			// Data from the PING
 			ws.Pong()
+			continue
 		}
 
 		// Make sure to broadcast only text messages,
 		// not Control frames like Close, Ping, and Pong
 		if opcode == 1 {
-			log.Println(msg)
-			messages <- string(msg)
+			log.Println(" WOOHOO msg <3 ", msg)
+			// Send MessageChan that contains the client channel
+			var m MessageChan
+			err := json.Unmarshal([]byte(msg), m)
+			if err != nil {
+				// TODO
+			}
+			messages <- m
 		}
 	}
 
-	l, err := json.Marshal(Message{Leaving: who})
-	if err != nil {
-		// TODO
-		log.Fatal(err)
-	}
 	leaving <- ch
-	messages <- string(l)
+	messages <- MessageChan{Client: ch, Message: ClientMessage{}}
 	return nil
 }
 
-func clientWriter(ws *Ws, ch <-chan string) {
+func clientWriter(ws *Ws, ch client) {
 	for msg := range ch {
-		err := ws.SendMsg(msg)
+		m, err := json.Marshal(msg)
+		if err != nil {
+			log.Fatal(err)
+			// Send HTTP error code
+			ws.conn.Close()
+		}
+		err = ws.SendMsg(string(m))
 		if err != nil {
 			log.Fatal(err)
 			// Send HTTP error code
@@ -324,7 +354,7 @@ func validateWsRequest(r *http.Request) (int, error) {
 	// handshake as per [RFC2616], so that both the client and the server
 	// can verify that they agree on which host is in use.
 	host := r.Host
-	fmt.Printf("host: %s\n", host)
+	// fmt.Printf("host: %s\n", host)
 	if host != "localhost:8080" {
 		return http.StatusForbidden, fmt.Errorf("forbidden host: %s\n", host)
 	}
@@ -514,7 +544,7 @@ func (ws *Ws) Send(msg string, opcd uint8) error {
 
 	frame := new(bytes.Buffer)
 	byte1 := (fin << 7) | (rsv1 << 6) | (rsv2 << 5) | (rsv3 << 4) | opcode
-	log.Println(byte1)
+	// log.Println(byte1)
 	err := frame.WriteByte(byte1)
 	if err != nil {
 		return err
