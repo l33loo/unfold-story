@@ -106,8 +106,7 @@ func main() {
 }
 
 // The server shouldn't be looking inside the message.
-// It just routes messages to the expected recipients,
-// and disables joining once the game has started.
+// It just routes messages to the expected recipients.
 // The browser sends arbitrary json as string.
 
 type ServerMessage struct {
@@ -124,7 +123,6 @@ type ServerMessage struct {
 type ClientMessage struct {
 	// NewPlayer serves for a new player to send its name
 	NewPlayer string `json:",omitempty"`
-	Start     bool   `json:",omitempty"`
 	// Broadcast is an arbitrary message from the server used for joining, leaving,
 	// status updates (who wrote which line)
 	// The client sends arbitrary JSON as string
@@ -191,8 +189,6 @@ func broadcast() {
 					}
 					cli.Client <- ServerMessage{Forward: msg.Message.NewPlayer}
 				}
-				// case msg.Message.Start:
-				// 	// TODO: fxn call...
 			}
 
 			log.Print("msg <3 ", msg)
