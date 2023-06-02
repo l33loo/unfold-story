@@ -30,7 +30,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         ws.onopen = () => {
             console.log("websocket open <3")
-            // ws.send(`${name}`)
+            const msg = {NewPlayer: name}
+            ws.send(JSON.stringify(msg))
+            const user = document.createElement("p")
+            user.textContent = `You are ${name}`
+            const players = document.getElementById("players")
+            body.insertBefore(user, players)
             const joinForm = document.getElementById("join")
             const game = document.createElement("div")
             game.setAttribute("id", "game")
@@ -66,106 +71,136 @@ document.addEventListener("DOMContentLoaded", () => {
             for (const property in msgObj) {
                 const val = msgObj[property]
                 switch (property) {
-                    case "Join":
-                        const user = document.createElement("p")
-                        user.textContent = `You are ${val}`
-                        
-                        const players = document.getElementById("players")
-                        body.insertBefore(user, players)
-                    case "Entering":
-                        const playerItem = document.createElement("li")
+                    case "Players":
+                        console.log("PROPERTY <3: ", property)
                         const playerList = document.getElementById("player-list")
-                        playerItem.textContent = val
-                        playerList.appendChild(playerItem)
-                        break
-                    case "Leaving":
-                        const playerItems = document.getElementsByTagName("li")
-                        for (const li of playerItems) {
-                            if (li.textContent.includes(val)) {
-                                li.remove()
-                                break
-                            }
-                        }
-                        break
-                    case "Line":
-                        const gameForm = document.createElement("form")
-                        gameForm.setAttribute("id", "game-form")
-                        const gameInput = document.createElement("input")
-                        gameInput.setAttribute("id", "text")
-                        const gameButton = document.createElement("button")
-                        gameButton.setAttribute("id", "submit-line")
-                        gameButton.textContent = "Submit a line"
-                        gameForm.appendChild(gameInput)
-                        gameForm.appendChild(gameButton)
-                        game.appendChild(gameForm)
-                        const gameLines = document.getElementById("game-lines")
-                        const line = document.createElement("li")
-                        line.textContent = val
-                        gameLines.appendChild(line)
-                        const submitLineEventHandler = ev => {
-                            ev.preventDefault()
-                            const line = gameInput.value
-                            const lineObj = {
-                                Line: line
-                            }
-                            ws.send(JSON.stringify(lineObj))
-                            console.log("Remove!")
-                            console.dir(gameForm)
-                            ev.currentTarget.remove()
-                        }
-                        gameForm.addEventListener("submit", submitLineEventHandler)
-                        break
-                    case "EmptyLine":
-                        const gameLines2 = document.getElementById("game-lines")
-                        const line2 = document.createElement("li")
-                        line2.textContent = "Hidden"
-                        gameLines2.appendChild(line2)
-                        break
-                    case "Start":
-                        const startForm = document.createElement("form")
-                        const startButton = document.createElement("button")
-                        startButton.setAttribute("id", "start")
-                        startButton.setAttribute("type", "submit")
-                        startButton.setAttribute("value", "Start game")
-                        startButton.textContent = "Start game"
-                        // const hiddenInput = document.createAttribute("input")
-                        // hiddenInput.setAttribute("type", "hidden")
-                        startForm.appendChild(startButton)
-                        // startForm.appendChild(hiddenInput)
-                        body.appendChild(startForm)
+                        playerList.innerHTML = ''
 
-                        startForm.addEventListener("submit", e => {
-                            e.preventDefault()
-                            startForm.remove()
-                            const gameForm = document.createElement("form")
-                        gameForm.setAttribute("id", "game-form")
-                        const gameInput = document.createElement("input")
-                        gameInput.setAttribute("id", "text")
-                        const gameButton = document.createElement("button")
-                        gameButton.setAttribute("id", "submit-line")
-                        gameButton.textContent = "Submit a line"
-                        gameForm.appendChild(gameInput)
-                        gameForm.appendChild(gameButton)
-                        game.appendChild(gameForm)
-                        // const gameLines = document.getElementById("game-lines")
-                        // const line = document.createElement("li")
-                        // line.textContent = val
-                        // gameLines.appendChild(line)
-                        const submitLineEventHandler = ev => {
-                            ev.preventDefault()
-                            const line = gameInput.value
-                            const lineObj = {
-                                Line: line
-                            }
-                            ws.send(JSON.stringify(lineObj))
-                            console.log("Remove!")
-                            console.dir(gameForm)
-                            console.dir(ev.currentTarget)
-                            ev.currentTarget.remove()
-                        }
-                        gameForm.addEventListener("submit", submitLineEventHandler)
+                        val.forEach(p => {
+                            const playerItem = document.createElement("li")
+                            playerItem.textContent = p
+                            playerList.appendChild(playerItem)
                         })
+
+                        // First or only user
+                        console.log("VAL <3: ", val)
+                        if (val.length === 1) {
+                            const gameForm = document.createElement("form")
+                            gameForm.setAttribute("id", "game-form")
+                            const gameInput = document.createElement("input")
+                            gameInput.setAttribute("id", "text")
+                            const gameButton = document.createElement("button")
+                            gameButton.setAttribute("id", "submit-line")
+                            gameButton.textContent = "Submit a line"
+                            gameForm.appendChild(gameInput)
+                            gameForm.appendChild(gameButton)
+                            const game = document.getElementById("game")
+                            game.appendChild(gameForm)
+                            // const gameLines = document.getElementById("game-lines")
+                            // const line = document.createElement("li")
+                            // line.textContent = val
+                            // gameLines.appendChild(line)
+                            const submitLineEventHandler = ev => {
+                                ev.preventDefault()
+                                const userObj = {
+                                    Broadcast: {
+                                        LineAuthor: name
+                                    }
+                                }
+                                ws.send(JSON.stringify(userObj))
+
+                                const line = gameInput.value
+                                const lineObj = {
+                                    NextPlayer: line
+                                }
+                                ws.send(JSON.stringify(lineObj))
+
+                                console.log("Remove!")
+                                console.dir(gameForm)
+                                console.dir(ev.currentTarget)
+                                ev.currentTarget.remove()
+                            }
+                            gameForm.addEventListener("submit", submitLineEventHandler)
+                        }
                         break
+                    case "Forward":
+                        console.log("PROPERTY <3: ", property)
+                        // const gameForm = document.createElement("form")
+                        // gameForm.setAttribute("id", "game-form")
+                        // const gameInput = document.createElement("input")
+                        // gameInput.setAttribute("id", "text")
+                        // const gameButton = document.createElement("button")
+                        // gameButton.setAttribute("id", "submit-line")
+                        // gameButton.textContent = "Submit a line"
+                        // gameForm.appendChild(gameInput)
+                        // gameForm.appendChild(gameButton)
+                        // game.appendChild(gameForm)
+                        if (!!val.LineAuthor) {
+                            const gameLines = document.getElementById("game-lines")
+                            const line = document.createElement("li")
+                            line.textContent = `Line by ${val.LineAuthor}`
+                            gameLines.appendChild(line)
+                        }
+
+                        if (!!val.NextPlayer) {
+                            const gameLines = document.getElementById("game-lines")
+                            const lastLine = gameLines.lastChild
+                            const line = document.createTextNode(`: ${val.NextPlayer}`)
+                            lastLine.appendChild(line)
+                            // const line = document.createElement("li")
+                            // line.textContent = val.NextPlayer
+                            // gameLines.appendChild(line)
+                            const gameForm = document.createElement("form")
+                            gameForm.setAttribute("id", "game-form")
+                            const gameInput = document.createElement("input")
+                            gameInput.setAttribute("id", "text")
+                            const gameButton = document.createElement("button")
+                            gameButton.setAttribute("id", "submit-line")
+                            gameButton.textContent = "Submit a line"
+                            gameForm.appendChild(gameInput)
+                            gameForm.appendChild(gameButton)
+                            game.appendChild(gameForm)
+                            const submitLineEventHandler = ev => {
+                                ev.preventDefault()
+
+                                const lineAuthor = {
+                                    Broadcast: {
+                                        LineAuthor: name
+                                    }
+                                }
+                                ws.send(JSON.stringify(lineAuthor))
+
+                                const line = gameInput.value
+                                const lineObj = {
+                                    NextPlayer: line
+                                }
+                                ws.send(JSON.stringify(lineObj))
+
+                                console.log("Remove!")
+                                console.dir(gameForm)
+                                ev.currentTarget.remove()
+                            }
+                            gameForm.addEventListener("submit", submitLineEventHandler)
+                        }
+                        break
+                    // case "Start":
+                    //     const startForm = document.createElement("form")
+                    //     const startButton = document.createElement("button")
+                    //     startButton.setAttribute("id", "start")
+                    //     startButton.setAttribute("type", "submit")
+                    //     startButton.setAttribute("value", "Start game")
+                    //     startButton.textContent = "Start game"
+                    //     // const hiddenInput = document.createAttribute("input")
+                    //     // hiddenInput.setAttribute("type", "hidden")
+                    //     startForm.appendChild(startButton)
+                    //     // startForm.appendChild(hiddenInput)
+                    //     body.appendChild(startForm)
+
+                    //     startForm.addEventListener("submit", e => {
+                    //         e.preventDefault()
+                    //         startForm.remove()
+                    //     })
+                        // break
                 }
             }
         }

@@ -111,11 +111,11 @@ func main() {
 
 type ServerMessage struct {
 	// Forward is a message sent from a client that's being forwarded to another
-	Forward string `json:",omitempty"`
+	Forward map[string]interface{} `json:",omitempty"`
 	// Players is to alert who is already connected. Use to check if a given
 	// player is the first one.
 	// TODO: make array of strings with usernames
-	Players []Player `json:",omitempty"`
+	Players []string `json:",omitempty"`
 	// Send all the lines at the end of games
 	TheEnd []string `json:",omitempty"`
 }
@@ -126,7 +126,7 @@ type ClientMessage struct {
 	// Broadcast is an arbitrary message from the server used for joining, leaving,
 	// status updates (who wrote which line)
 	// The client sends arbitrary JSON as string
-	Broadcast string `json:",omitempty"`
+	Broadcast map[string]interface{} `json:",omitempty"`
 	// NextPlayer is the latest game line sent to the next player
 	NextPlayer string `json:",omitempty"`
 }
@@ -154,56 +154,76 @@ var (
 
 // }
 
+func convertPlayerOrderToString(po []Player) []string {
+	userNames := make([]string, len(po))
+	for i, p := range po {
+		userNames[i] = p.UserName
+	}
+
+	return userNames
+}
+
 func broadcast() {
 	var playerOrder []Player
 	playerTurn := 0
 	for {
 		select {
-		case cli := <-entering:
-			log.Print(cli)
-			cli.Client <- ServerMessage{Players: playerOrder}
-			log.Print(playerOrder, playerTurn)
+		case <-entering:
+			// log.Print(cli)
+			// cli.Client <- ServerMessage{Players: convertPlayerOrderToString(playerOrder)}
+			// log.Print(playerOrder, playerTurn)
 		case msg := <-messages:
 			switch {
 			case msg.Message.NewPlayer != "":
+				fmt.Printf("msg from server <3 NewPlayer: %+v\n", msg)
 				// TODO: fxn call...
 				playerOrder = append(playerOrder, Player{Client: msg.Client, UserName: msg.Message.NewPlayer})
 				for _, cli := range playerOrder {
-					cli.Client <- ServerMessage{Players: playerOrder}
+					cli.Client <- ServerMessage{Players: convertPlayerOrderToString(playerOrder)}
 				}
-			case msg.Message.Broadcast != "":
+			case msg.Message.Broadcast != nil:
+				fmt.Printf("msg from server <3 Broadcast: %+v\n", msg)
 				// TODO: fxn call...
 				for _, cli := range playerOrder {
 					cli.Client <- ServerMessage{Forward: msg.Message.Broadcast}
 				}
 			case msg.Message.NextPlayer != "":
+				fmt.Printf("msg from server <3 NextPlayer: %+v\n", msg)
 				// TODO: fxn call...
 				c := playerOrder[playerTurn]
 				for _, cli := range playerOrder {
 					if c.Client == cli.Client {
+						c.Client <- ServerMessage{Forward: map[string]interface{}{
+							"NextPlayer": msg.Message.NextPlayer,
+						}}
 						if playerTurn == len(playerOrder)-1 {
 							playerTurn = 0
 						} else {
 							playerTurn++
 						}
 					}
-					cli.Client <- ServerMessage{Forward: msg.Message.NewPlayer}
 				}
+			default:
+				log.Print("msg defaul <3 ", msg)
 			}
 
-			log.Print("msg <3 ", msg)
-			log.Print(playerOrder, playerTurn)
+			// log.Print("msg from server <3 ", msg)
+
+			fmt.Printf("playerOrder: %+v\n", playerOrder)
+			log.Println(playerTurn)
 		case cli := <-leaving:
 			for i, c := range playerOrder {
 				if c.Client == cli {
 					playerOrder = append(playerOrder[:i], playerOrder[i+1:]...)
-					if playerTurn == 0 {
+					if len(playerOrder) == 1 {
+						playerTurn = 0
+					} else if playerTurn == 0 {
 						playerTurn = len(playerOrder) - 1
 					} else {
 						playerTurn--
 					}
 				}
-				c.Client <- ServerMessage{Players: playerOrder}
+				c.Client <- ServerMessage{Players: convertPlayerOrderToString(playerOrder)}
 			}
 			close(cli)
 		}
@@ -245,7 +265,7 @@ loop:
 			}
 		}
 
-		if opcode == 0x9 {
+		if opcode == 0x9 || msg == "PING" {
 			// If receive PING, send PONG back
 			// if the connection wasn't closed,
 			// TODO: sending back the same Application
@@ -256,20 +276,22 @@ loop:
 
 		// Make sure to broadcast only text messages,
 		// not Control frames like Close, Ping, and Pong
-		if opcode == 1 {
-			log.Println(" WOOHOO msg <3 ", msg)
+		if opcode == 1 && msg != "PING" && msg != "PONG" {
+			log.Println(" WOOHOO msg from browser <3 ", msg)
 			// Send MessageChan that contains the client channel
-			var m MessageChan
-			err := json.Unmarshal([]byte(msg), m)
+			var m ClientMessage
+			err := json.Unmarshal([]byte(msg), &m)
 			if err != nil {
+				log.Fatal("unmarshall error <3: ", err)
 				// TODO
 			}
-			messages <- m
+			fmt.Printf("CLientMessage: %+v\n", m)
+			messages <- MessageChan{Client: ch, Message: m}
 		}
 	}
 
 	leaving <- ch
-	messages <- MessageChan{Client: ch, Message: ClientMessage{}}
+	messages <- MessageChan{Client: ch}
 	return nil
 }
 
