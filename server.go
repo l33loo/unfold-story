@@ -189,6 +189,11 @@ func broadcast() {
 				}
 			case msg.Message.NextPlayer != "":
 				fmt.Printf("msg from server <3 NextPlayer: %+v\n", msg)
+				if playerTurn == len(playerOrder)-1 {
+					playerTurn = 0
+				} else {
+					playerTurn++
+				}
 				// TODO: fxn call...
 				c := playerOrder[playerTurn]
 				for _, cli := range playerOrder {
@@ -196,11 +201,7 @@ func broadcast() {
 						c.Client <- ServerMessage{Forward: map[string]interface{}{
 							"NextPlayer": msg.Message.NextPlayer,
 						}}
-						if playerTurn == len(playerOrder)-1 {
-							playerTurn = 0
-						} else {
-							playerTurn++
-						}
+
 					}
 				}
 			default:
