@@ -159,6 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
                             gameButton.textContent = "Submit a line"
                             gameForm.appendChild(gameInput)
                             gameForm.appendChild(gameButton)
+                            const game = document.getElementById("game")
                             game.appendChild(gameForm)
                             const submitLineEventHandler = ev => {
                                 ev.preventDefault()
@@ -183,6 +184,23 @@ document.addEventListener("DOMContentLoaded", () => {
                             gameForm.addEventListener("submit", submitLineEventHandler)
                         }
                         break
+                    case "TheEnd":
+                        const gameForm = document.getElementById("game-form")
+                        if (gameForm) {
+                            gameForm.remove()
+                        }
+                        const gameLines = document.getElementById("game-lines")
+                        gameLines.innerHTML = ""
+                        val.forEach(l => {
+                            const li = document.createElement("li")
+                            li.textContent = l
+                            gameLines.appendChild(li)
+                        })
+                        gameLines.replaceChildren(finalLines)
+                        const theEnd = document.createElement("div")
+                        theEnd.textContent = "The End!"
+                        const game = document.getElementById("game")
+                        game.appendChild(theEnd)
                     // case "Start":
                     //     const startForm = document.createElement("form")
                     //     const startButton = document.createElement("button")

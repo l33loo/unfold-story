@@ -166,6 +166,7 @@ func convertPlayerOrderToString(po []Player) []string {
 func broadcast() {
 	var playerOrder []Player
 	playerTurn := 0
+	var lines []string
 	for {
 		select {
 		case <-entering:
@@ -188,6 +189,7 @@ func broadcast() {
 					cli.Client <- ServerMessage{Forward: msg.Message.Broadcast}
 				}
 			case msg.Message.NextPlayer != "":
+				lines = append(lines, fmt.Sprintf("Line by %s: %s", playerOrder[playerTurn].UserName, msg.Message.NextPlayer))
 				fmt.Printf("msg from server <3 NextPlayer: %+v\n", msg)
 				if playerTurn == len(playerOrder)-1 {
 					playerTurn = 0
@@ -197,7 +199,10 @@ func broadcast() {
 				// TODO: fxn call...
 				c := playerOrder[playerTurn]
 				for _, cli := range playerOrder {
-					if c.Client == cli.Client {
+					// End game automatically
+					if len(lines) >= 10 && len(lines) >= len(playerOrder)*2 {
+						cli.Client <- ServerMessage{TheEnd: lines}
+					} else if c.Client == cli.Client {
 						c.Client <- ServerMessage{Forward: map[string]interface{}{
 							"NextPlayer": msg.Message.NextPlayer,
 						}}
