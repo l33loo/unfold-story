@@ -114,15 +114,16 @@ type ServerMessage struct {
 	Forward map[string]interface{} `json:",omitempty"`
 	// Players is to alert who is already connected. Use to check if a given
 	// player is the first one.
-	// TODO: make array of strings with usernames
-	Players []string `json:",omitempty"`
+	Players []Author `json:",omitempty"`
 	// Send all the lines at the end of games
-	TheEnd []string `json:",omitempty"`
+	TheEnd []Line `json:",omitempty"`
+	// LineAuthors is used to send the authors of each story line to a new player
+	LineAuthors []Author `json:",omitempty"`
 }
 
 type ClientMessage struct {
 	// NewPlayer serves for a new player to send its name
-	NewPlayer string `json:",omitempty"`
+	NewPlayer Author `json:",omitempty"`
 	// Broadcast is an arbitrary message from the server used for joining, leaving,
 	// status updates (who wrote which line)
 	// The client sends arbitrary JSON as string
@@ -138,7 +139,7 @@ type MessageChan struct {
 
 type Player struct {
 	Client   client
-	UserName string
+	UserName Author
 }
 
 type client chan ServerMessage
@@ -154,8 +155,8 @@ var (
 
 // }
 
-func convertPlayerOrderToString(po []Player) []string {
-	userNames := make([]string, len(po))
+func convertPlayerOrderToString(po []Player) []Author {
+	userNames := make([]Author, len(po))
 	for i, p := range po {
 		userNames[i] = p.UserName
 	}
@@ -163,10 +164,25 @@ func convertPlayerOrderToString(po []Player) []string {
 	return userNames
 }
 
+func convertLinesToAuthors(lines []Line) []Author {
+	authors := make([]Author, len(lines))
+	for i, l := range lines {
+		authors[i] = l.Author
+	}
+	return authors
+}
+
+type Author string
+
+type Line struct {
+	Text string
+	Author
+}
+
 func broadcast() {
 	var playerOrder []Player
 	playerTurn := 0
-	var lines []string
+	var lines []Line
 	for {
 		select {
 		case <-entering:
@@ -182,6 +198,10 @@ func broadcast() {
 				for _, cli := range playerOrder {
 					cli.Client <- ServerMessage{Players: convertPlayerOrderToString(playerOrder)}
 				}
+				lenLines := len(lines)
+				if lenLines > 0 {
+					msg.Client <- ServerMessage{LineAuthors: convertLinesToAuthors(lines)}
+				}
 			case msg.Message.Broadcast != nil:
 				fmt.Printf("msg from server <3 Broadcast: %+v\n", msg)
 				// TODO: fxn call...
@@ -189,7 +209,10 @@ func broadcast() {
 					cli.Client <- ServerMessage{Forward: msg.Message.Broadcast}
 				}
 			case msg.Message.NextPlayer != "":
-				lines = append(lines, fmt.Sprintf("Line by %s: %s", playerOrder[playerTurn].UserName, msg.Message.NextPlayer))
+				lines = append(lines, Line{
+					Author: playerOrder[playerTurn].UserName,
+					Text:   msg.Message.NextPlayer,
+				})
 				fmt.Printf("msg from server <3 NextPlayer: %+v\n", msg)
 				if playerTurn == len(playerOrder)-1 {
 					playerTurn = 0

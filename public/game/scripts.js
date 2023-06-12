@@ -55,6 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         ws.onmessage = (e) => {
+            const gameLines = document.getElementById("game-lines")
             console.log("ws data <3:")
             // TODO: Handle PINGs and PONGs
             if (e.data === "PING" || e.data === "PONG") {
@@ -123,6 +124,13 @@ document.addEventListener("DOMContentLoaded", () => {
                             gameForm.addEventListener("submit", submitLineEventHandler)
                         }
                         break
+                    case "LineAuthors":
+                        for (i = 0; i < val.length; i++) {
+                            const line = document.createElement("li")
+                            line.textContent = `Line by ${val[i]}`
+                            gameLines.appendChild(line)
+                        }
+                        break
                     case "Forward":
                         console.log("PROPERTY <3: ", property)
                         // const gameForm = document.createElement("form")
@@ -136,14 +144,12 @@ document.addEventListener("DOMContentLoaded", () => {
                         // gameForm.appendChild(gameButton)
                         // game.appendChild(gameForm)
                         if (!!val.LineAuthor) {
-                            const gameLines = document.getElementById("game-lines")
                             const line = document.createElement("li")
                             line.textContent = `Line by ${val.LineAuthor}`
                             gameLines.appendChild(line)
                         }
 
                         if (!!val.NextPlayer) {
-                            const gameLines = document.getElementById("game-lines")
                             const lastLine = gameLines.lastChild
                             const line = document.createTextNode(`: ${val.NextPlayer}`)
                             lastLine.appendChild(line)
@@ -189,7 +195,6 @@ document.addEventListener("DOMContentLoaded", () => {
                         if (gameForm) {
                             gameForm.remove()
                         }
-                        const gameLines = document.getElementById("game-lines")
                         gameLines.innerHTML = ""
                         val.forEach(l => {
                             const li = document.createElement("li")
@@ -201,6 +206,7 @@ document.addEventListener("DOMContentLoaded", () => {
                         theEnd.textContent = "The End!"
                         const game = document.getElementById("game")
                         game.appendChild(theEnd)
+                        break
                     // case "Start":
                     //     const startForm = document.createElement("form")
                     //     const startButton = document.createElement("button")
@@ -218,7 +224,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     //         e.preventDefault()
                     //         startForm.remove()
                     //     })
-                        // break
                 }
             }
         }
