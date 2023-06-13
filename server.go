@@ -183,6 +183,7 @@ func broadcast() {
 	var playerOrder []Player
 	playerTurn := 0
 	var lines []Line
+	isTheEnd := false
 	for {
 		select {
 		case <-entering:
@@ -199,7 +200,9 @@ func broadcast() {
 					cli.Client <- ServerMessage{Players: convertPlayerOrderToString(playerOrder)}
 				}
 				lenLines := len(lines)
-				if lenLines > 0 {
+				if isTheEnd {
+					msg.Client <- ServerMessage{TheEnd: lines}
+				} else if lenLines > 0 {
 					msg.Client <- ServerMessage{LineAuthors: convertLinesToAuthors(lines)}
 				}
 			case msg.Message.Broadcast != nil:
@@ -224,6 +227,7 @@ func broadcast() {
 				for _, cli := range playerOrder {
 					// End game automatically
 					if len(lines) >= 10 && len(lines) >= len(playerOrder)*2 {
+						isTheEnd = true
 						cli.Client <- ServerMessage{TheEnd: lines}
 					} else if c.Client == cli.Client {
 						c.Client <- ServerMessage{Forward: map[string]interface{}{
