@@ -198,10 +198,9 @@ document.addEventListener("DOMContentLoaded", () => {
                         gameLines.innerHTML = ""
                         val.forEach(l => {
                             const li = document.createElement("li")
-                            li.textContent = l
+                            li.textContent = `Line by ${l.Author}: ${l.Text}`
                             gameLines.appendChild(li)
                         })
-                        gameLines.replaceChildren(finalLines)
                         const theEnd = document.createElement("div")
                         theEnd.textContent = "The End!"
                         const game = document.getElementById("game")
