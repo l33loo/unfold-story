@@ -74,7 +74,7 @@ func main() {
 		io.Copy(w, f)
 	})
 
-	http.HandleFunc("/game", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/game/", func(w http.ResponseWriter, r *http.Request) {
 		f, err := os.Open("./public/game/index.html")
 		if err != nil {
 			fmt.Println(err.Error())
