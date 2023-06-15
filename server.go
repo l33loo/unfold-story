@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path"
 	"strings"
 )
 
@@ -90,7 +91,9 @@ func main() {
 			return
 		}
 
-		err = WsHandler(w, r, ws)
+		uuid := path.Base(r.URL.Path)
+
+		err = WsHandler(w, r, ws, uuid)
 		// TODO: Change error handling because may no longer use HTTP
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -262,7 +265,7 @@ func broadcast() {
 	}
 }
 
-func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) error {
+func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws, uuid string) error {
 	defer ws.Close()
 
 	// Frame
