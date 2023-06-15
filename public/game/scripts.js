@@ -1,4 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
+    const url = window.location.href
+    const urlParts = url.split("/")
+    const uuid = urlParts[urlParts.length - 1]
     const playerName = localStorage.getItem("name")
     if (playerName !== null && playerName.length > 0) {
         const nameInput = document.getElementById("name")
@@ -18,7 +21,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // We can’t use XMLHttpRequest or fetch to make this kind of HTTP-request,
         // because JavaScript is not allowed to set these headers.
         // https://javascript.info/websocket
-        let ws = new WebSocket("ws://localhost:8080/ws")
+        const ws = new WebSocket(`ws://localhost:8080/ws/${uuid}`)
         ws.onerror = (e) => {
             console.log("websocket error:")
             console.dir(e)

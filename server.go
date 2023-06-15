@@ -79,11 +79,10 @@ func main() {
 		if err != nil {
 			fmt.Println(err.Error())
 		}
-
 		io.Copy(w, f)
 	})
 
-	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+	http.HandleFunc("/ws/", func(w http.ResponseWriter, r *http.Request) {
 		ws, err := handshake(w, r)
 		if err != nil {
 			log.Fatal(err)
