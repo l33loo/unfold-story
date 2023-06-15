@@ -19,7 +19,7 @@ import (
 )
 
 func main() {
-	go broadcast()
+	go gameManager()
 
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-type", "text/html")
@@ -91,9 +91,8 @@ func main() {
 			return
 		}
 
-		uuid := path.Base(r.URL.Path)
+		err = WsHandler(w, r, ws)
 
-		err = WsHandler(w, r, ws, uuid)
 		// TODO: Change error handling because may no longer use HTTP
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -145,13 +144,17 @@ type Player struct {
 }
 
 type client chan ServerMessage
+type gameChannels struct {
+	messages chan MessageChan
+	leaving  chan client
+}
+type replyChan chan gameChannels
+type gameSession struct {
+	uuid string
+	replyChan
+}
 
-var (
-	entering = make(chan Player)
-	// TODO: make messages channel unmarshalled struct
-	messages = make(chan MessageChan)
-	leaving  = make(chan client)
-)
+var createGame = make(chan gameSession)
 
 // func handleNewPlayer() {
 
@@ -181,18 +184,34 @@ type Line struct {
 	Author
 }
 
-func broadcast() {
+// gameManager controls access to the mapping from UUID to game channels
+func gameManager() {
+	games := make(map[string]gameChannels)
+	for {
+		gameSess := <-createGame
+		uuid := gameSess.uuid
+		replyCh := gameSess.replyChan
+		_, ok := games[uuid]
+		if !ok {
+			gameCh := gameChannels{
+				messages: make(chan MessageChan),
+				leaving:  make(chan client),
+			}
+			games[uuid] = gameCh
+			go broadcast(gameCh)
+		}
+		replyCh <- games[uuid]
+	}
+}
+
+func broadcast(gameCh gameChannels) {
 	var playerOrder []Player
 	playerTurn := 0
 	var lines []Line
 	isTheEnd := false
 	for {
 		select {
-		case <-entering:
-			// log.Print(cli)
-			// cli.Client <- ServerMessage{Players: convertPlayerOrderToString(playerOrder)}
-			// log.Print(playerOrder, playerTurn)
-		case msg := <-messages:
+		case msg := <-gameCh.messages:
 			switch {
 			case msg.Message.NewPlayer != "":
 				fmt.Printf("msg from server <3 NewPlayer: %+v\n", msg)
@@ -246,7 +265,7 @@ func broadcast() {
 
 			fmt.Printf("playerOrder: %+v\n", playerOrder)
 			log.Println(playerTurn)
-		case cli := <-leaving:
+		case cli := <-gameCh.leaving:
 			for i, c := range playerOrder {
 				if c.Client == cli {
 					playerOrder = append(playerOrder[:i], playerOrder[i+1:]...)
@@ -265,7 +284,7 @@ func broadcast() {
 	}
 }
 
-func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws, uuid string) error {
+func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) error {
 	defer ws.Close()
 
 	// Frame
@@ -279,11 +298,13 @@ func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws, uuid string) er
 
 	ch := make(client)
 	go clientWriter(ws, ch)
-
-	// who := ws.conn.RemoteAddr().String()
-	// ch <- ServerMessage{Players: []}
-	// messages <- MessageChan{Client: ch, Message: ClientMessage{}}
-	entering <- Player{Client: ch, UserName: ""}
+	u := path.Base(req.URL.Path)
+	replyCh := make(replyChan)
+	createGame <- gameSession{
+		uuid:      u,
+		replyChan: replyCh,
+	}
+	gameChans := <-replyCh
 
 loop:
 	for {
@@ -321,12 +342,12 @@ loop:
 				// TODO
 			}
 			fmt.Printf("CLientMessage: %+v\n", m)
-			messages <- MessageChan{Client: ch, Message: m}
+			gameChans.messages <- MessageChan{Client: ch, Message: m}
 		}
 	}
 
-	leaving <- ch
-	messages <- MessageChan{Client: ch}
+	gameChans.leaving <- ch
+	gameChans.messages <- MessageChan{Client: ch}
 	return nil
 }
 
