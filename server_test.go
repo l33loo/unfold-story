@@ -63,11 +63,8 @@ func TestUnmarshalJsonString(t *testing.T) {
 }
 
 func TestUnmarshalArbitraryJson(t *testing.T) {
-	type Obj struct {
-		Broadcast map[string]interface{}
-	}
 	str := `{"Broadcast": {"User": "name"}}`
-	b := Obj{}
+	b := ClientMessage{}
 	err := json.Unmarshal([]byte(str), &b)
 	if err != nil {
 		t.Fatalf(`JSON arbitrary struct unmarshal error: "%s", should not have error`, err.Error())
@@ -79,10 +76,7 @@ func TestUnmarshalArbitraryJson(t *testing.T) {
 }
 
 func TestMarshalArbitraryJson(t *testing.T) {
-	type Obj struct {
-		Broadcast map[string]interface{}
-	}
-	s := Obj{Broadcast: map[string]interface{}{
+	s := ClientMessage{Broadcast: map[string]interface{}{
 		"User": "name",
 	}}
 	s.Broadcast["User"] = "name"
