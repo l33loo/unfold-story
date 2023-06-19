@@ -116,10 +116,6 @@ func main() {
 	}
 }
 
-// The server shouldn't be looking inside the message.
-// It just routes messages to the expected recipients.
-// The browser sends arbitrary json as string.
-
 type ServerMessage struct {
 	// Forward is a message sent from a client that's being forwarded to another
 	Forward map[string]interface{} `json:",omitempty"`
@@ -136,8 +132,9 @@ type ClientMessage struct {
 	// NewPlayer serves for a new player to send its name
 	NewPlayer Author `json:",omitempty"`
 	// Broadcast is an arbitrary message from the server used for joining, leaving,
-	// status updates (who wrote which line)
-	// The client sends arbitrary JSON as string
+	// status updates (who wrote which line).
+	// The client sends arbitrary JSON as string.
+	// The server shouldn't be looking inside this message.
 	Broadcast map[string]interface{} `json:",omitempty"`
 	// NextPlayer is the latest game line sent to the next player
 	NextPlayer string `json:",omitempty"`
