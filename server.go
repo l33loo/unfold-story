@@ -27,8 +27,10 @@ func main() {
 		if err != nil {
 			log.Println(err.Error())
 		}
-
-		io.Copy(w, f)
+		_, err = io.Copy(w, f)
+		if err != nil {
+			log.Println(err.Error())
+		}
 	})
 
 	http.HandleFunc("/public/styles.css", func(w http.ResponseWriter, r *http.Request) {
@@ -38,41 +40,46 @@ func main() {
 		if err != nil {
 			log.Println(err.Error())
 		}
-
-		io.Copy(w, f)
+		_, err = io.Copy(w, f)
+		if err != nil {
+			log.Println(err.Error())
+		}
 	})
 
 	http.HandleFunc("/public/scripts.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-type", "text/javascript")
 		f, err := os.Open("./public/scripts.js")
-
 		if err != nil {
 			log.Println(err.Error())
 		}
-
-		io.Copy(w, f)
+		_, err = io.Copy(w, f)
+		if err != nil {
+			log.Println(err.Error())
+		}
 	})
 
 	http.HandleFunc("/public/game/styles.css", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-type", "text/css")
 		f, err := os.Open("./public/game/styles.css")
-
 		if err != nil {
 			log.Println(err.Error())
 		}
-
-		io.Copy(w, f)
+		_, err = io.Copy(w, f)
+		if err != nil {
+			log.Println(err.Error())
+		}
 	})
 
 	http.HandleFunc("/public/game/scripts.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-type", "text/javascript")
 		f, err := os.Open("./public/game/scripts.js")
-
 		if err != nil {
 			log.Println(err.Error())
 		}
-
-		io.Copy(w, f)
+		_, err = io.Copy(w, f)
+		if err != nil {
+			log.Println(err.Error())
+		}
 	})
 
 	http.HandleFunc("/game/", func(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +87,10 @@ func main() {
 		if err != nil {
 			log.Println(err.Error())
 		}
-		io.Copy(w, f)
+		_, err = io.Copy(w, f)
+		if err != nil {
+			log.Println(err.Error())
+		}
 	})
 
 	http.HandleFunc("/ws/", func(w http.ResponseWriter, r *http.Request) {
