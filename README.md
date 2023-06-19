@@ -10,4 +10,4 @@ An online version of the classic folding story game, in which players collective
 
 # License
 
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/l33loo/karpowicz.dev/blob/master/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/l33loo/unfold-story/blob/master/LICENSE) file for details.
