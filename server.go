@@ -25,7 +25,7 @@ func main() {
 		w.Header().Add("Content-type", "text/html")
 		f, err := os.Open("./public/index.html")
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Println(err.Error())
 		}
 
 		io.Copy(w, f)
@@ -36,7 +36,7 @@ func main() {
 		f, err := os.Open("./public/styles.css")
 
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Println(err.Error())
 		}
 
 		io.Copy(w, f)
@@ -47,7 +47,7 @@ func main() {
 		f, err := os.Open("./public/scripts.js")
 
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Println(err.Error())
 		}
 
 		io.Copy(w, f)
@@ -58,7 +58,7 @@ func main() {
 		f, err := os.Open("./public/game/styles.css")
 
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Println(err.Error())
 		}
 
 		io.Copy(w, f)
@@ -69,7 +69,7 @@ func main() {
 		f, err := os.Open("./public/game/scripts.js")
 
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Println(err.Error())
 		}
 
 		io.Copy(w, f)
@@ -78,7 +78,7 @@ func main() {
 	http.HandleFunc("/game/", func(w http.ResponseWriter, r *http.Request) {
 		f, err := os.Open("./public/game/index.html")
 		if err != nil {
-			fmt.Println(err.Error())
+			log.Println(err.Error())
 		}
 		io.Copy(w, f)
 	})
@@ -86,8 +86,8 @@ func main() {
 	http.HandleFunc("/ws/", func(w http.ResponseWriter, r *http.Request) {
 		ws, err := handshake(w, r)
 		if err != nil {
-			log.Fatal(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			log.Println(err.Error)
 			return
 		}
 
@@ -312,11 +312,11 @@ loop:
 		if err != nil {
 			switch err {
 			case io.EOF:
-				fmt.Println("end of file <3")
+				log.Println("end of file error: ", err.Error())
 				break loop
 			default:
-				fmt.Println("closing error <3")
-				fmt.Println(err.Error())
+				log.Println()
+				log.Println("closing error: ", err.Error())
 				break loop
 			}
 		}
@@ -338,7 +338,7 @@ loop:
 			var m ClientMessage
 			err := json.Unmarshal([]byte(msg), &m)
 			if err != nil {
-				log.Fatal("unmarshall error <3: ", err)
+				log.Println("unmarshall error <3: ", err)
 				// TODO
 			}
 			fmt.Printf("CLientMessage: %+v\n", m)
@@ -355,13 +355,13 @@ func clientWriter(ws *Ws, ch client) {
 	for msg := range ch {
 		m, err := json.Marshal(msg)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err.Error())
 			// Send HTTP error code
 			ws.conn.Close()
 		}
 		err = ws.SendMsg(string(m))
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err.Error())
 			// Send HTTP error code
 			ws.conn.Close()
 		}
@@ -371,7 +371,7 @@ func clientWriter(ws *Ws, ch client) {
 func handshake(w http.ResponseWriter, r *http.Request) (*Ws, error) {
 	httpStatus, err := validateWsRequest(r)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		http.Error(w, err.Error(), httpStatus)
 	}
 	// As per RFC6455:
@@ -462,12 +462,12 @@ func validateWsRequest(r *http.Request) (int, error) {
 func (ws *Ws) Close() {
 	err := ws.Send("", 0x8)
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err.Error())
 	}
 
 	err = ws.conn.Close()
 	if err != nil {
-		log.Fatal(err)
+		log.Println(err.Error())
 	}
 }
 
