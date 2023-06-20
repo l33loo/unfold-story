@@ -502,30 +502,22 @@ func (ws *Ws) Recv() (string, uint8, error) {
 	parsedFrame := parseFrameHead(head1)
 	// TODO: validate rsv1, rsv2, rsv3, and mask
 	if parsedFrame.payLen == 126 {
-		// TODO: replace following code with binary.Read
-		head2 := make([]byte, 2)
-		_, err = io.ReadFull(ws.bufrw, head2)
+		var head2 uint16
+		// As per RFC6455:
+		// in network order (big endian)
+		err := binary.Read(ws.bufrw, binary.BigEndian, &head2)
 		if err != nil {
 			return "", 0, err
 		}
-		var byte1 = uint16(head2[0])
-		var byte2 = uint16(head2[1])
-		parsedFrame.extPayLen1 = (byte1 << 8) | byte2
+		parsedFrame.extPayLen1 = head2
 	}
 	if parsedFrame.payLen == 127 {
-		// TODO: replace following code with binary.Read
-		head2 := make([]byte, 8)
-		_, err = io.ReadFull(ws.bufrw, head2)
+		var head2 uint64
+		err := binary.Read(ws.bufrw, binary.BigEndian, &head2)
 		if err != nil {
 			return "", 0, err
 		}
-		var acc uint64
-		for i := 0; i < 8; i++ {
-			shift := 8 * (7 - i)
-			next := uint64(head2[i])
-			acc = (next << shift) | acc
-		}
-		parsedFrame.extPayLen2 = acc
+		parsedFrame.extPayLen2 = head2
 	}
 	maskKey := make([]byte, 4)
 	_, err = io.ReadFull(ws.bufrw, maskKey)
@@ -640,8 +632,6 @@ func (ws *Ws) Send(msg string, opcd uint8) error {
 			return err
 		}
 		bytes34 := uint16(payLen)
-		// As per RFC6455:
-		// in network order (big endian)
 		err = binary.Write(frame, binary.BigEndian, bytes34)
 		if err != nil {
 			return err
@@ -654,8 +644,6 @@ func (ws *Ws) Send(msg string, opcd uint8) error {
 			return err
 		}
 		nextBytes := uint64(payLen)
-		// As per RFC6455:
-		// in network order (big endian)
 		err = binary.Write(frame, binary.BigEndian, nextBytes)
 		if err != nil {
 			return err
