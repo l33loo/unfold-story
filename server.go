@@ -647,6 +647,8 @@ func (ws *Ws) Send(msg string, opcd uint8) error {
 			return err
 		}
 		bytes34 := uint16(payLen)
+		// As per RFC6455:
+		// in network order (big endian)
 		err = binary.Write(frame, binary.BigEndian, bytes34)
 		if err != nil {
 			return err
@@ -659,6 +661,8 @@ func (ws *Ws) Send(msg string, opcd uint8) error {
 			return err
 		}
 		nextBytes := uint64(payLen)
+		// As per RFC6455:
+		// in network order (big endian)
 		err = binary.Write(frame, binary.BigEndian, nextBytes)
 		if err != nil {
 			return err
