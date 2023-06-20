@@ -491,27 +491,20 @@ func (ws *Ws) write(data []byte) error {
 	return ws.bufrw.Flush()
 }
 
-func (ws *Ws) read(buf []byte) error {
-	_, err := ws.bufrw.Read(buf)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
 func (ws *Ws) Recv() (string, uint8, error) {
 	// TODO: opcode, fail if RSV values are not 0,
 	// fail if not masked, unmask
 	head1 := make([]byte, 2)
-	err := ws.read(head1)
+	_, err := io.ReadFull(ws.bufrw, head1)
 	if err != nil {
 		return "", 0, err
 	}
 	parsedFrame := parseFrameHead(head1)
 	// TODO: validate rsv1, rsv2, rsv3, and mask
 	if parsedFrame.payLen == 126 {
+		// TODO: replace following code with binary.Read
 		head2 := make([]byte, 2)
-		err = ws.read(head2)
+		_, err = io.ReadFull(ws.bufrw, head2)
 		if err != nil {
 			return "", 0, err
 		}
@@ -520,8 +513,9 @@ func (ws *Ws) Recv() (string, uint8, error) {
 		parsedFrame.extPayLen1 = (byte1 << 8) | byte2
 	}
 	if parsedFrame.payLen == 127 {
+		// TODO: replace following code with binary.Read
 		head2 := make([]byte, 8)
-		err = ws.read(head2)
+		_, err = io.ReadFull(ws.bufrw, head2)
 		if err != nil {
 			return "", 0, err
 		}
@@ -534,7 +528,7 @@ func (ws *Ws) Recv() (string, uint8, error) {
 		parsedFrame.extPayLen2 = acc
 	}
 	maskKey := make([]byte, 4)
-	err = ws.read(maskKey)
+	_, err = io.ReadFull(ws.bufrw, maskKey)
 	if err != nil {
 		return "", 0, err
 	}
@@ -543,8 +537,7 @@ func (ws *Ws) Recv() (string, uint8, error) {
 
 	payLen := getPayloadLength(parsedFrame)
 	pay := make([]byte, payLen)
-
-	err = ws.read(pay)
+	_, err = io.ReadFull(ws.bufrw, pay)
 	if err != nil {
 		return "", 0, err
 	}
