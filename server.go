@@ -97,7 +97,7 @@ func main() {
 		ws, err := handshake(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Println(err.Error)
+			log.Println(err.Error())
 			return
 		}
 
