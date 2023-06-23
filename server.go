@@ -437,7 +437,7 @@ func validateWsRequest(r *http.Request) (int, error) {
 	host := r.Host
 	// fmt.Printf("host: %s\n", host)
 	if host != "localhost:8080" {
-		return http.StatusForbidden, fmt.Errorf("forbidden host: %s\n", host)
+		return http.StatusForbidden, fmt.Errorf("forbidden host: %s", host)
 	}
 
 	// An |Upgrade| header field containing the value "websocket",
