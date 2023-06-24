@@ -573,9 +573,11 @@ func parseFramePayload(frame []byte, parsedFrame Frame, idx int) {
 
 func unmaskPayload(frame Frame) string {
 	key := frame.maskKey
-	unmasked := make([]byte, frame.payLen)
+	payLen := getPayloadLength(frame)
+	unmasked := make([]byte, payLen)
 	keyIdx := 0
 	for i, e := range frame.payload {
+
 		unmasked[i] = e ^ key[keyIdx]
 		if keyIdx == len(key)-1 {
 			keyIdx = 0
