@@ -18,71 +18,104 @@ import (
 	"strings"
 )
 
+type handle func(http.ResponseWriter, *http.Request) error
+
+func (h handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	err := h(w, r)
+	if err != nil {
+		log.Print(err.Error())
+	}
+}
+
 func main() {
 	go gameManager()
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/html")
 		f, err := os.Open("./public/index.html")
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
-	})
 
-	http.HandleFunc("/public/styles.css", func(w http.ResponseWriter, r *http.Request) {
+		return nil
+	}))
+
+	http.Handle("/public/styles.css", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/css")
 		f, err := os.Open("./public/styles.css")
 
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
-	})
 
-	http.HandleFunc("/public/scripts.js", func(w http.ResponseWriter, r *http.Request) {
+		return nil
+	}))
+
+	http.Handle("/public/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/javascript")
 		f, err := os.Open("./public/scripts.js")
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
-	})
 
-	http.HandleFunc("/public/game/styles.css", func(w http.ResponseWriter, r *http.Request) {
+		return nil
+	}))
+
+	http.Handle("/public/game/styles.css", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/css")
 		f, err := os.Open("./public/game/styles.css")
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
-	})
 
-	http.HandleFunc("/public/game/scripts.js", func(w http.ResponseWriter, r *http.Request) {
+		return nil
+	}))
+
+	http.Handle("/public/game/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/javascript")
 		f, err := os.Open("./public/game/scripts.js")
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			log.Println(err.Error())
+			return err
 		}
-	})
 
-	http.HandleFunc("/game/", func(w http.ResponseWriter, r *http.Request) {
+		return nil
+	}))
+
+	http.Handle("/public/game/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) error {
+		w.Header().Add("Content-type", "text/javascript")
+		f, err := os.Open("./public/game/scripts.js")
+		if err != nil {
+			return err
+		}
+		_, err = io.Copy(w, f)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}))
+
+	http.Handle("/game/", handle(func(w http.ResponseWriter, r *http.Request) error {
 		f, err := os.Open("./public/game/index.html")
 		if err != nil {
 			log.Println(err.Error())
@@ -91,14 +124,15 @@ func main() {
 		if err != nil {
 			log.Println(err.Error())
 		}
-	})
 
-	http.HandleFunc("/ws/", func(w http.ResponseWriter, r *http.Request) {
+		return nil
+	}))
+
+	http.Handle("/ws/", handle(func(w http.ResponseWriter, r *http.Request) error {
 		ws, err := handshake(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			log.Println(err.Error())
-			return
+			return err
 		}
 
 		err = WsHandler(w, r, ws)
@@ -106,9 +140,11 @@ func main() {
 		// TODO: Change error handling because may no longer use HTTP
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
+			return err
 		}
-	})
+
+		return nil
+	}))
 
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {
@@ -346,7 +382,7 @@ loop:
 			err := json.Unmarshal([]byte(msg), &m)
 			if err != nil {
 				log.Println("unmarshall error <3: ", err)
-				// TODO
+				return err
 			}
 			fmt.Printf("CLientMessage: %+v\n", m)
 			gameChans.messages <- MessageChan{Client: ch, Message: m}
@@ -363,13 +399,11 @@ func clientWriter(ws *Ws, ch client) {
 		m, err := json.Marshal(msg)
 		if err != nil {
 			log.Println(err.Error())
-			// Send HTTP error code
 			ws.conn.Close()
 		}
 		err = ws.SendMsg(string(m))
 		if err != nil {
 			log.Println(err.Error())
-			// Send HTTP error code
 			ws.conn.Close()
 		}
 	}
@@ -378,8 +412,8 @@ func clientWriter(ws *Ws, ch client) {
 func handshake(w http.ResponseWriter, r *http.Request) (*Ws, error) {
 	httpStatus, err := validateWsRequest(r)
 	if err != nil {
-		log.Println(err)
 		http.Error(w, err.Error(), httpStatus)
+		return nil, err
 	}
 	// As per RFC6455:
 	// For this header field [Sec-WebSocket-Key], the server has to take the value (as present
