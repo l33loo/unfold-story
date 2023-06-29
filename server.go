@@ -18,129 +18,124 @@ import (
 	"strings"
 )
 
-type handle func(http.ResponseWriter, *http.Request) Err
+type handle func(http.ResponseWriter, *http.Request) error
 
 func (h handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	var err Err
+	var err error
 	select {
 	case err = <-errChan:
-		log.Printf("%s%s", err.CustomErr, err.Err)
 	default:
 		err = h(w, r)
 	}
 
-	if err.Err != nil {
-		ce := ""
-		if err.CustomErr != "" {
-			ce = err.CustomErr + ": "
-		}
-		log.Printf("%s%s", ce, err.Err)
+	if err != nil {
+		log.Print(err)
 	}
 }
 
 func main() {
 	go gameManager()
 
-	http.Handle("/", handle(func(w http.ResponseWriter, r *http.Request) Err {
+	http.Handle("/", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/html")
 		f, err := os.Open("./public/index.html")
 		if err != nil {
-			return Err{err, "error opening ./public/index.html"}
+			return fmt.Errorf("error opening ./public/index.html: %w", err)
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			return Err{err, "error copying ./public/index.html"}
+			return fmt.Errorf("error copying ./public/index.html: %w", err)
 		}
 
-		return Err{}
+		return nil
 	}))
 
-	http.Handle("/public/styles.css", handle(func(w http.ResponseWriter, r *http.Request) Err {
+	http.Handle("/public/styles.css", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/css")
 		f, err := os.Open("./public/styles.css")
 
 		if err != nil {
-			return Err{err, "error opening ./public/styles.css"}
+			return fmt.Errorf("error opening ./public/styles.css: %w", err)
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			return Err{err, "error copying ./public/styles.css"}
+			return fmt.Errorf("error copying ./public/styles.css: %w", err)
 		}
 
-		return Err{}
+		return nil
 	}))
 
-	http.Handle("/public/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) Err {
+	http.Handle("/public/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/javascript")
 		f, err := os.Open("./public/scripts.js")
 		if err != nil {
-			return Err{err, "error opening ./public/scripts.js"}
+			return fmt.Errorf("error opening ./public/scripts.js: %w", err)
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			return Err{err, "error copying ./public/scripts.js"}
+			return fmt.Errorf("error copying ./public/scripts.js: %w", err)
 		}
 
-		return Err{}
+		return nil
 	}))
 
-	http.Handle("/public/game/styles.css", handle(func(w http.ResponseWriter, r *http.Request) Err {
+	http.Handle("/public/game/styles.css", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/css")
 		f, err := os.Open("./public/game/styles.css")
 		if err != nil {
-			return Err{err, "error opening ./public/game/styles.css"}
+			return fmt.Errorf("error opening ./public/game/styles.css: %w", err)
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			return Err{err, "error copying ./public/game/styles.css"}
+			return fmt.Errorf("error copying ./public/game/styles.css: %w", err)
 		}
 
-		return Err{}
+		return nil
 	}))
 
-	http.Handle("/public/game/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) Err {
+	http.Handle("/public/game/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) error {
 		w.Header().Add("Content-type", "text/javascript")
 		f, err := os.Open("./public/game/scripts.js")
 		if err != nil {
-			return Err{err, "error opening ./public/game/scripts.js"}
+			return fmt.Errorf("error opening ./public/game/scripts.js: %w", err)
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			return Err{err, "error copying ./public/game/scripts.js"}
+			return fmt.Errorf("error copying ./public/game/scripts.js: %w", err)
 		}
 
-		return Err{}
+		return nil
 	}))
 
-	http.Handle("/game/", handle(func(w http.ResponseWriter, r *http.Request) Err {
+	http.Handle("/game/", handle(func(w http.ResponseWriter, r *http.Request) error {
 		f, err := os.Open("./public/game/index.html")
 		if err != nil {
-			return Err{err, "error opening ./public/game/index.html"}
+			return fmt.Errorf("error opening ./public/game/index.html: %w", err)
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
-			return Err{err, "error copying ./public/game/index.html"}
+			return fmt.Errorf("error copying ./public/game/index.html: %w", err)
 		}
 
-		return Err{}
+		return nil
 	}))
 
-	http.Handle("/ws/", handle(func(w http.ResponseWriter, r *http.Request) Err {
+	http.Handle("/ws/", handle(func(w http.ResponseWriter, r *http.Request) error {
 		ws, err := handshake(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return Err{err, "error with ws handshake"}
+			return fmt.Errorf("error with ws handshake: %w", err)
 		}
 
-		err2 := WsHandler(w, r, ws)
+		err = WsHandler(w, r, ws)
 
 		// TODO: Change error handling because may no longer use HTTP
-		if err2.Err != nil {
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return err2
+			return err
 		}
 
-		return Err{}
+		return nil
 	}))
 
 	err := http.ListenAndServe(":8080", nil)
@@ -149,12 +144,7 @@ func main() {
 	}
 }
 
-type Err struct {
-	Err       error
-	CustomErr string
-}
-
-var errChan = make(chan Err)
+var errChan = make(chan error)
 
 type ServerMessage struct {
 	// Forward is a message sent from a client that's being forwarded to another
@@ -331,7 +321,7 @@ func broadcast(gameCh gameChannels) {
 	}
 }
 
-func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) Err {
+func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) error {
 	defer ws.Close()
 
 	// Frame
@@ -356,14 +346,14 @@ func WsHandler(w http.ResponseWriter, req *http.Request, ws *Ws) Err {
 loop:
 	for {
 		msg, opcode, err := ws.Recv()
-		if err.Err != nil {
-			switch err.Err {
+		if err != nil {
+			switch err {
 			case io.EOF:
-				log.Println("end of file error: ", err.Err.Error())
+				log.Println("end of file error: ", err.Error())
 				break loop
 			default:
 				log.Println()
-				log.Println("closing error: ", err.Err.Error())
+				log.Println("closing error: ", err.Error())
 				break loop
 			}
 		}
@@ -385,7 +375,7 @@ loop:
 			var m ClientMessage
 			err := json.Unmarshal([]byte(msg), &m)
 			if err != nil {
-				return Err{err, "unmarshall error"}
+				return fmt.Errorf("unmarshall error: %w", err)
 			}
 			fmt.Printf("CLientMessage: %+v\n", m)
 			gameChans.messages <- MessageChan{Client: ch, Message: m}
@@ -394,7 +384,7 @@ loop:
 
 	gameChans.leaving <- ch
 	gameChans.messages <- MessageChan{Client: ch}
-	return Err{}
+	return nil
 }
 
 func clientWriter(ws *Ws, ch client) {
@@ -404,9 +394,9 @@ func clientWriter(ws *Ws, ch client) {
 			log.Println(err.Error())
 			ws.Close()
 		}
-		err2 := ws.SendMsg(string(m))
-		if err2.Err != nil {
-			log.Println(err2.Err.Error())
+		err = ws.SendMsg(string(m))
+		if err != nil {
+			log.Println(err)
 			ws.Close()
 		}
 	}
@@ -506,36 +496,41 @@ func validateWsRequest(r *http.Request) (int, error) {
 func (ws *Ws) Close() {
 	// Send closing frame
 	err := ws.Send("", 0x8)
-	if err.Err != nil {
+	if err != nil {
 		errChan <- err
 	}
 
-	err2 := ws.conn.Close()
-	if err2 != nil {
-		errChan <- Err{err2, "error closing ws connection"}
+	err = ws.conn.Close()
+	if err != nil {
+		errChan <- fmt.Errorf("error closing ws connection: %w", err)
 	}
 }
 
-func (ws *Ws) SendMsg(msg string) Err {
+func (ws *Ws) SendMsg(msg string) error {
 	err := ws.Send(msg, 1)
 	return err
 }
 
-func (ws *Ws) write(data []byte) Err {
+func (ws *Ws) write(data []byte) error {
 	_, err := ws.bufrw.Write(data)
 	if err != nil {
-		return Err{err, "error writing to ws connection"}
+		return fmt.Errorf("error writing to ws connection: %w", err)
 	}
-	return Err{ws.bufrw.Flush(), "error flushing ws writer"}
+	err = ws.bufrw.Flush()
+	if err != nil {
+		return fmt.Errorf("error flushing ws writer: %w", err)
+	}
+
+	return nil
 }
 
-func (ws *Ws) Recv() (string, uint8, Err) {
+func (ws *Ws) Recv() (string, uint8, error) {
 	// TODO: opcode, fail if RSV values are not 0,
 	// fail if not masked, unmask
 	head := make([]byte, 2)
 	_, err := io.ReadFull(ws.bufrw, head)
 	if err != nil {
-		return "", 0, Err{err, "error reading frame head"}
+		return "", 0, fmt.Errorf("error reading frame head: %w", err)
 	}
 	parsedFrame := parseFrameHead(head)
 	// TODO: validate rsv1, rsv2, rsv3, and mask
@@ -545,7 +540,7 @@ func (ws *Ws) Recv() (string, uint8, Err) {
 		// in network order (big endian)
 		err := binary.Read(ws.bufrw, binary.BigEndian, &extPayLen16)
 		if err != nil {
-			return "", 0, Err{err, "error reading extended pay length (16)"}
+			return "", 0, fmt.Errorf("error reading extended pay length (16): %w", err)
 		}
 		parsedFrame.extPayLen1 = extPayLen16
 	}
@@ -553,14 +548,14 @@ func (ws *Ws) Recv() (string, uint8, Err) {
 		var extPayLen64 uint64
 		err := binary.Read(ws.bufrw, binary.BigEndian, &extPayLen64)
 		if err != nil {
-			return "", 0, Err{err, "error reading extended pay length (64)"}
+			return "", 0, fmt.Errorf("error reading extended pay length (64): %w", err)
 		}
 		parsedFrame.extPayLen2 = extPayLen64
 	}
 	maskKey := make([]byte, 4)
 	_, err = io.ReadFull(ws.bufrw, maskKey)
 	if err != nil {
-		return "", 0, Err{err, "error reading masking key"}
+		return "", 0, fmt.Errorf("error reading masking key: %w", err)
 	}
 
 	parsedFrame.maskKey = maskKey
@@ -569,11 +564,11 @@ func (ws *Ws) Recv() (string, uint8, Err) {
 	pay := make([]byte, payLen)
 	_, err = io.ReadFull(ws.bufrw, pay)
 	if err != nil {
-		return "", 0, Err{err, "error reading payload"}
+		return "", 0, fmt.Errorf("error reading payload: %w", err)
 	}
 	parsedFrame.payload = pay
 	unmasked := unmaskPayload(parsedFrame)
-	return unmasked, parsedFrame.opcode, Err{}
+	return unmasked, parsedFrame.opcode, nil
 }
 
 func parseFrameHead(frame []byte) Frame {
@@ -637,7 +632,7 @@ func (ws *Ws) Pong() {
 	ws.Send("PONG", 0xA)
 }
 
-func (ws *Ws) Send(msg string, opcd uint8) Err {
+func (ws *Ws) Send(msg string, opcd uint8) error {
 	pay := []byte(msg)
 	payLen := len(pay)
 
@@ -653,7 +648,7 @@ func (ws *Ws) Send(msg string, opcd uint8) Err {
 	// log.Println(byte1)
 	err := frame.WriteByte(byte1)
 	if err != nil {
-		return Err{err, "error writing byte 1 to ws frame"}
+		return fmt.Errorf("error writing byte 1 to ws frame: %w", err)
 	}
 
 	switch {
@@ -662,39 +657,39 @@ func (ws *Ws) Send(msg string, opcd uint8) Err {
 		byte2 := (masked << 7) | uint8(payLen)
 		err = frame.WriteByte(byte2)
 		if err != nil {
-			return Err{err, "error writing byte 2 to ws frame (<126)"}
+			return fmt.Errorf("error writing byte 2 to ws frame (<126): %w", err)
 		}
 	case payLen < (1 << 16):
 		// 7+16 bits
 		byte2 := (masked << 7) | (uint8(126))
 		err = frame.WriteByte(byte2)
 		if err != nil {
-			return Err{err, "error writing byte 2 to ws frame (==126)"}
+			return fmt.Errorf("error writing byte 2 to ws frame (==126): %w", err)
 		}
 		bytes34 := uint16(payLen)
 		err = binary.Write(frame, binary.BigEndian, bytes34)
 		if err != nil {
-			return Err{err, "error writing extended payload length to ws frame (16)"}
+			return fmt.Errorf("error writing extended payload length to ws frame (16): %w", err)
 		}
 	default:
 		// 7+64 bits
 		byte2 := (masked << 7) | (uint8(127))
 		err = frame.WriteByte(byte2)
 		if err != nil {
-			return Err{err, "error writing byte 2 to ws frame (==127)"}
+			return fmt.Errorf("error writing byte 2 to ws frame (==127): %w", err)
 		}
 		nextBytes := uint64(payLen)
 		err = binary.Write(frame, binary.BigEndian, nextBytes)
 		if err != nil {
-			return Err{err, "error writing extended payload length to ws frame (64)"}
+			return fmt.Errorf("error writing extended payload length to ws frame (64): %w", err)
 		}
 	}
 	_, err = frame.Write(pay)
 	if err != nil {
-		return Err{err, "error writing payload to ws frame"}
+		return fmt.Errorf("error writing payload to ws frame: %w", err)
 	}
 	ws.write(frame.Bytes())
-	return Err{}
+	return nil
 }
 
 type Ws struct {
