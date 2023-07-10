@@ -3,3 +3,7 @@
 
 # wireshark capture
 wireshark_*/
+
+# test coverage report
+testcoverage
+testcoverage.html
