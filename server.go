@@ -37,80 +37,29 @@ func main() {
 	go gameManager()
 
 	http.Handle("/", handle(func(w http.ResponseWriter, r *http.Request) error {
-		w.Header().Add("Content-type", "text/html")
-		f, err := os.Open("./public/index.html")
-		if err != nil {
-			return fmt.Errorf("error opening ./public/index.html: %w", err)
-		}
-		_, err = io.Copy(w, f)
-		if err != nil {
-			return fmt.Errorf("error copying ./public/index.html: %w", err)
-		}
-
-		return nil
+		return fileHandler("./public/index.html", "text/html", w)
 	}))
 
 	http.Handle("/public/styles.css", handle(func(w http.ResponseWriter, r *http.Request) error {
-		w.Header().Add("Content-type", "text/css")
-		f, err := os.Open("./public/styles.css")
-
-		if err != nil {
-			return fmt.Errorf("error opening ./public/styles.css: %w", err)
-		}
-		_, err = io.Copy(w, f)
-		if err != nil {
-			return fmt.Errorf("error copying ./public/styles.css: %w", err)
-		}
-
-		return nil
+		return fileHandler("./public/styles.css", "text/css", w)
 	}))
 
 	http.Handle("/public/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) error {
-		w.Header().Add("Content-type", "text/javascript")
-		f, err := os.Open("./public/scripts.js")
-		if err != nil {
-			return fmt.Errorf("error opening ./public/scripts.js: %w", err)
-		}
-		_, err = io.Copy(w, f)
-		if err != nil {
-			return fmt.Errorf("error copying ./public/scripts.js: %w", err)
-		}
-
-		return nil
+		return fileHandler("./public/scripts.js", "text/javascript", w)
 	}))
 
 	http.Handle("/public/game/styles.css", handle(func(w http.ResponseWriter, r *http.Request) error {
-		w.Header().Add("Content-type", "text/css")
-		f, err := os.Open("./public/game/styles.css")
-		if err != nil {
-			return fmt.Errorf("error opening ./public/game/styles.css: %w", err)
-		}
-		_, err = io.Copy(w, f)
-		if err != nil {
-			return fmt.Errorf("error copying ./public/game/styles.css: %w", err)
-		}
-
-		return nil
+		return fileHandler("./public/game/styles.css", "text/css", w)
 	}))
 
 	http.Handle("/public/game/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) error {
-		w.Header().Add("Content-type", "text/javascript")
-		f, err := os.Open("./public/game/scripts.js")
-		if err != nil {
-			return fmt.Errorf("error opening ./public/game/scripts.js: %w", err)
-		}
-		_, err = io.Copy(w, f)
-		if err != nil {
-			return fmt.Errorf("error copying ./public/game/scripts.js: %w", err)
-		}
-
-		return nil
+		return fileHandler("./public/game/scripts.js", "text/javascript", w)
 	}))
 
 	http.Handle("/game/", handle(func(w http.ResponseWriter, r *http.Request) error {
 		f, err := os.Open("./public/game/index.html")
 		if err != nil {
-			return fmt.Errorf("error opening ./public/game/index.html: %w", err)
+			return err
 		}
 		_, err = io.Copy(w, f)
 		if err != nil {
@@ -142,6 +91,20 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func fileHandler(path string, contentType string, w http.ResponseWriter) error {
+	w.Header().Add("Content-type", contentType)
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(w, f)
+	if err != nil {
+		return fmt.Errorf("error copying %s: %w", path, err)
+	}
+
+	return nil
 }
 
 var errChan = make(chan error)
