@@ -34,6 +34,11 @@ func (h handle) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	server()
+}
+
+// Removed from main func for testability
+func server() {
 	go gameManager()
 
 	http.Handle("/", handle(func(w http.ResponseWriter, r *http.Request) error {
