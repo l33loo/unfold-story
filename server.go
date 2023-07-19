@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"crypto/sha1"
+	_ "embed"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
@@ -13,7 +14,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"os"
 	"path"
 	"strings"
 )
@@ -37,41 +37,51 @@ func main() {
 	server()
 }
 
+//go:embed public/index.html
+var html []byte
+
+//go:embed public/styles.css
+var styles []byte
+
+//go:embed public/scripts.js
+var scripts []byte
+
+//go:embed public/game/styles.css
+var gameStyles []byte
+
+//go:embed public/game/scripts.js
+var gameScripts []byte
+
+//go:embed public/game/index.html
+var gameHTML []byte
+
 // Removed from main func for testability
 func server() {
 	go gameManager()
 
 	http.Handle("/", handle(func(w http.ResponseWriter, r *http.Request) error {
-		return fileHandler("./public/index.html", "text/html", w)
+		return fileHandler(html, "text/html", w)
 	}))
 
 	http.Handle("/public/styles.css", handle(func(w http.ResponseWriter, r *http.Request) error {
-		return fileHandler("./public/styles.css", "text/css", w)
+		return fileHandler(styles, "text/css", w)
 	}))
 
 	http.Handle("/public/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) error {
-		return fileHandler("./public/scripts.js", "text/javascript", w)
+		return fileHandler(scripts, "text/javascript", w)
 	}))
 
 	http.Handle("/public/game/styles.css", handle(func(w http.ResponseWriter, r *http.Request) error {
-		return fileHandler("./public/game/styles.css", "text/css", w)
+
+		return fileHandler(gameStyles, "text/css", w)
 	}))
 
 	http.Handle("/public/game/scripts.js", handle(func(w http.ResponseWriter, r *http.Request) error {
-		return fileHandler("./public/game/scripts.js", "text/javascript", w)
+		return fileHandler(gameScripts, "text/javascript", w)
 	}))
 
 	http.Handle("/game/", handle(func(w http.ResponseWriter, r *http.Request) error {
-		f, err := os.Open("./public/game/index.html")
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(w, f)
-		if err != nil {
-			return fmt.Errorf("error copying ./public/game/index.html: %w", err)
-		}
-
-		return nil
+		return fileHandler(gameHTML, "text/html", w)
 	}))
 
 	http.Handle("/ws/", handle(func(w http.ResponseWriter, r *http.Request) error {
@@ -98,15 +108,11 @@ func server() {
 	}
 }
 
-func fileHandler(path string, contentType string, w http.ResponseWriter) error {
+func fileHandler(file []byte, contentType string, w http.ResponseWriter) error {
 	w.Header().Add("Content-type", contentType)
-	f, err := os.Open(path)
+	_, err := w.Write(file)
 	if err != nil {
-		return err
-	}
-	_, err = io.Copy(w, f)
-	if err != nil {
-		return fmt.Errorf("error copying %s: %w", path, err)
+		return fmt.Errorf("error sending response: %w", err)
 	}
 
 	return nil
