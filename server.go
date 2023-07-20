@@ -86,6 +86,9 @@ func server() {
 
 	http.Handle("/ws/", handle(func(w http.ResponseWriter, r *http.Request) error {
 		ws, err := handshake(w, r)
+		// As per RFC6455:
+		// If the invalid data is sent during the WebSocket handshake,
+		// the server SHOULD return an appropriate HTTP [RFC2616] status code.
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return fmt.Errorf("error with ws handshake: %w", err)
